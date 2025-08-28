@@ -7,25 +7,18 @@ type Cookies = NextRequest['cookies'] | ReadonlyRequestCookies;
 const COOKIE_NAME = process.env.NEXT_PUBLIC_CLIENT_COOKIE || 'quotavera_client_id';
 
 /**
- * Retrieves the client ID from cookies. If not present, generates a new one,
- * sets it in the cookies, and returns it.
+ * Retrieves the client ID from cookies. If not present, generates a new one.
  *
- * @param cookies - The cookies object from either a NextRequest or next/headers.
- * @returns The client_id string.
+ * @param cookies - The cookies object from a NextRequest or next/headers.
+ * @returns An object containing the clientId and a flag indicating if it's new.
  */
-export function getOrSetClientId(cookies: Cookies): string {
-  let clientId = cookies.get(COOKIE_NAME)?.value;
+export function getOrGenerateClientId(cookies: Cookies): { clientId: string; isNew: boolean } {
+  const clientId = cookies.get(COOKIE_NAME)?.value;
 
-  if (!clientId) {
-    clientId = uuidv4();
-    const oneYearInSeconds = 365 * 24 * 60 * 60;
-    cookies.set(COOKIE_NAME, clientId, {
-      httpOnly: false, // Must be readable by client-side scripts if needed
-      sameSite: 'lax',
-      path: '/',
-      maxAge: oneYearInSeconds,
-    });
+  if (clientId) {
+    return { clientId, isNew: false };
   }
 
-  return clientId;
+  const newClientId = uuidv4();
+  return { clientId: newClientId, isNew: true };
 }
