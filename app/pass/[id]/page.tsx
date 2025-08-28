@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { createBrowserClient } from '@/lib/supabase';
+import { createServerClient } from '@/lib/supabase';
 import { TicketWithProduct } from '@/lib/types';
 import ShareButton from '@/components/ShareButton';
 
@@ -13,7 +13,7 @@ type Props = {
 
 export default async function PassPage({ params }: Props) {
   const { id } = params;
-  const supabase = createBrowserClient();
+  const supabase = createServerClient();
 
   const { data: ticket, error } = await supabase
     .from('tickets')
@@ -46,13 +46,13 @@ export default async function PassPage({ params }: Props) {
 
       <div className="p-4 space-y-6 flex flex-col items-center">
         {/* Asset Image */}
-        <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-lg">
+        <div className="w-full max-w-sm aspect-[4/3] rounded-2xl overflow-hidden shadow-lg relative">
           <Image
             src={typedTicket.asset_url}
             alt={typedTicket.products?.name || 'Product Image'}
-            width={500}
-            height={500}
-            className="w-full h-auto object-cover"
+            fill
+            className="object-cover"
+            sizes="(max-width: 640px) 100vw, 640px"
             priority
           />
         </div>

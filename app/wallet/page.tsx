@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { createBrowserClient } from '@/lib/supabase';
+import { createServerClient } from '@/lib/supabase';
+import Image from 'next/image';
 import BottomNav from '@/components/BottomNav';
 
 export const revalidate = 0;
@@ -12,9 +13,9 @@ type OrderWithDetails = {
   tickets: { id: string; serial: string; }[];
 };
 
-export default async function WalletPage() {
+export default async function WalletPage({ searchParams }: { searchParams?: { success?: string } }) {
   const cookieStore = cookies();
-  const clientId = cookieStore.get(process.env.NEXT_PUBLIC_CLIENT_COOKIE || 'quotavera_client_id')?.value;
+  const clientId = cookieStore.get('qv_client_id')?.value;
 
   if (!clientId) {
     return (
@@ -34,7 +35,7 @@ export default async function WalletPage() {
     );
   }
 
-  const supabase = createBrowserClient();
+  const supabase = createServerClient();
   const { data: orders, error } = await supabase
     .from('orders')
     .select(`
@@ -53,12 +54,19 @@ export default async function WalletPage() {
 
   const typedOrders = orders as OrderWithDetails[] | null;
 
+  const success = searchParams?.success;
+
   return (
     <div className="relative flex size-full min-h-screen flex-col bg-[#f8f9fc] justify-between font-sans">
       <div className="flex-grow">
         <div className="flex items-center bg-[#f8f9fc] p-4 pb-2 justify-between">
           <h2 className="text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">Portafoglio</h2>
         </div>
+        {success === '1' && (
+            <div className="p-4 mx-4 my-2 text-sm text-green-800 rounded-lg bg-green-50" role="alert">
+                Attivazione completata. I tuoi pass sono nel Portafoglio.
+            </div>
+        )}
         <h2 className="text-[#0e121b] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Le tue Attivazioni</h2>
 
         <div className="pb-24">
@@ -70,10 +78,9 @@ export default async function WalletPage() {
               return (
                 <div key={order.id} className="p-4">
                   <div className="flex flex-col items-stretch justify-start rounded-xl shadow-lg overflow-hidden bg-white">
-                    <div
-                      className="w-full bg-center bg-no-repeat aspect-video bg-cover"
-                      style={{ backgroundImage: `url("${order.products.cover_url}")` }}
-                    ></div>
+                    <div className="w-full aspect-[4/3] relative">
+                        <Image src={order.products.cover_url} alt={order.products.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
+                    </div>
                     <div className="p-4">
                       <p className="text-[#0e121b] text-lg font-bold leading-tight tracking-[-0.015em]">
                         {order.products.name}

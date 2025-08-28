@@ -1,101 +1,100 @@
 import Link from 'next/link';
-import { createBrowserClient } from '@/lib/supabase';
+import Image from 'next/image';
+import { createServerClient } from '@/lib/supabase';
 import { formatCurrencyEUR, progressPct } from '@/lib/format';
 import BottomNav from '@/components/BottomNav';
 
-// Re-enable caching after data is dynamic
 export const revalidate = 0;
 
-export default async function HomePage() {
-  const supabase = createBrowserClient();
-  const { data: products, error } = await supabase
+export default async function Home({ searchParams }: { searchParams: { cat?: string } }) {
+  const cat = searchParams?.cat;
+  const supabase = createServerClient();
+
+  let query = supabase
     .from('products')
-    .select('id, slug, name, est_value_eur, target_activations, activations_count, cover_url')
+    .select('*')
+    .eq('status', 'open')
     .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching products:', error);
-    // Render an error state or return null
-    return (
-      <div className="text-red-500 text-center p-4">
-        Failed to load products: {error.message}
-      </div>
-    );
+  if (cat) {
+    query = query.eq('category', cat);
   }
 
-  const featuredProducts = products?.slice(0, 3) || [];
-  const allProducts = products || [];
+  const { data: products, error } = await query;
+
+  if (error) {
+    return <div className="p-4 text-red-500">Errore caricamento prodotti: {error.message}</div>;
+  }
+
+  const filters = [
+    { label: 'Tutti', v: undefined },
+    { label: 'Orologi', v: 'orologi' },
+    { label: 'Auto', v: 'auto' },
+    { label: 'Borse', v: 'borse' },
+    { label: 'Case', v: 'case' },
+    { label: 'Altro', v: 'altro' },
+  ];
 
   return (
-    <div className="relative flex size-full min-h-screen flex-col bg-[#f8f9fc] justify-between group/design-root overflow-x-hidden font-sans">
-      <div className="pb-24">
-        <div className="flex items-center bg-[#f8f9fc] p-4 pb-2 justify-between">
-          <h2 className="text-[#0e121b] text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center">
-            QuotaVera
-          </h2>
-        </div>
-        <h2 className="text-[#0e121b] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">
-          In evidenza
-        </h2>
-        <div className="flex overflow-y-auto [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex items-stretch p-4 gap-3">
-            {featuredProducts.map((product) => (
-              <Link href={`/product/${product.slug}`} key={product.id} className="flex h-full flex-1 flex-col gap-4 rounded-lg min-w-60">
-                <div
-                  className="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-xl flex flex-col"
-                  style={{ backgroundImage: `url("${product.cover_url}")` }}
-                ></div>
-                <div>
-                  <p className="text-[#0e121b] text-base font-medium leading-normal">{product.name}</p>
-                  <p className="text-[#4e6797] text-sm font-normal leading-normal">
-                    Valore stimato: {formatCurrencyEUR(product.est_value_eur)}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
+    <div className="pb-20">
+      <header className="p-4">
+        <h1 className="text-2xl font-bold text-[#0e121b] text-center">QuotaVera</h1>
+      </header>
 
-        {/* Category filters (static for now) */}
-        <div className="flex gap-3 p-3 overflow-x-auto [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="flex h-8 shrink-0 items-center justify-center gap-x-2 rounded-xl bg-[#e7ebf3] px-4">
-            <p className="text-[#0e121b] text-sm font-medium leading-normal">Tutti</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col">
-          {allProducts.map((product) => {
-            const progress = progressPct(product.activations_count, product.target_activations);
-            return (
-              <Link href={`/product/${product.slug}`} key={product.id} className="flex items-center gap-4 bg-[#f8f9fc] px-4 min-h-[72px] py-2 border-b border-gray-200">
-                <div
-                  className="bg-center bg-no-repeat aspect-square bg-cover rounded-lg size-14"
-                  style={{ backgroundImage: `url("${product.cover_url}")` }}
-                ></div>
-                <div className="flex-1 flex flex-col justify-center">
-                  <p className="text-[#0e121b] text-base font-medium leading-normal line-clamp-1">{product.name}</p>
-                  <p className="text-[#4e6797] text-sm font-normal leading-normal line-clamp-2">
-                    Valore stimato: {formatCurrencyEUR(product.est_value_eur)}
-                  </p>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5 mt-1">
-                    <div
-                      className="bg-blue-600 h-2.5 rounded-full"
-                      style={{ width: `${progress}%` }}
-                    ></div>
-                  </div>
-                   <p className="text-xs text-gray-500 mt-1">{Math.round(progress)}% completato</p>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
+      <div className="px-4 pb-4 flex gap-2 overflow-x-auto [-ms-scrollbar-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {filters.map((f) => (
+          <Link
+            key={f.label}
+            href={f.v ? `/?cat=${f.v}` : '/'}
+            className={`px-4 h-9 rounded-full flex items-center justify-center text-sm font-medium whitespace-nowrap ${
+              cat === f.v || (!cat && !f.v)
+                ? 'bg-[#081c44] text-white'
+                : 'bg-[#e7ebf3] text-[#0e121b]'
+            }`}
+          >
+            {f.label}
+          </Link>
+        ))}
       </div>
 
-      <div>
-        <p className="text-[#4e6797] text-sm font-normal leading-normal pb-3 pt-1 px-4 text-center">
-          Nota legale: I concorsi a premi sono soggetti a termini e condizioni. Si prega di giocare responsabilmente.
-        </p>
-        <BottomNav />
+      <main className="px-4 space-y-4">
+        {products?.map((p) => {
+          const pct = progressPct(p.activations_count, p.target_activations);
+          return (
+            <Link key={p.id} href={`/product/${p.slug}`} className="block bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="aspect-[4/3] w-full overflow-hidden relative">
+                <Image
+                  src={p.cover_url}
+                  alt={p.name}
+                  fill
+                  className="w-full h-full object-cover"
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                />
+              </div>
+              <div className="p-4">
+                <h2 className="font-bold text-lg">{p.name}</h2>
+                <p className="text-sm text-gray-600">
+                  Valore stimato: {formatCurrencyEUR(p.est_value_eur)}
+                </p>
+                <div className="mt-2">
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className="bg-[#081c44] h-2 rounded-full"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <div className="text-xs text-right text-gray-500 mt-1">
+                    {p.activations_count}/{p.target_activations} ({Math.round(pct)}%)
+                  </div>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </main>
+
+      <div className="fixed bottom-0 left-0 right-0">
+        <BottomNav active="home" />
       </div>
     </div>
   );

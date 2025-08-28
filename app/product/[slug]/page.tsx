@@ -1,7 +1,8 @@
 import React from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { createServerSupabase } from '@/lib/supabase-server';
+import { createServerClient } from '@/lib/supabase';
+import Image from 'next/image';
 import { formatCurrencyEUR, progressPct } from '@/lib/format';
 
 // Disabilita cache per dati dinamici
@@ -27,7 +28,7 @@ type Product = {
 
 export default async function ProductDetailPage({ params }: Props) {
   const { slug } = params;
-  const supabase = createServerSupabase();
+  const supabase = createServerClient();
 
   const { data: productRaw, error: productError } = await supabase
     .from('products')
@@ -57,12 +58,16 @@ export default async function ProductDetailPage({ params }: Props) {
         </div>
 
         {/* Immagine */}
-        <div
-          className="w-full bg-center bg-no-repeat aspect-square bg-cover"
-          style={{ backgroundImage: `url("${product.cover_url}")` }}
-          role="img"
-          aria-label={product.name}
-        />
+        <div className="w-full aspect-[4/3] relative">
+            <Image
+                src={product.cover_url}
+                alt={product.name}
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
+                priority
+            />
+        </div>
 
         <div className="p-4 space-y-4">
           {/* Info prodotto */}
@@ -82,9 +87,9 @@ export default async function ProductDetailPage({ params }: Props) {
           {/* Barra di progresso */}
           <div>
             <h3 className="font-bold text-lg mb-2">Progresso</h3>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div className="w-full bg-gray-200 rounded-full h-2">
               <div
-                className="bg-blue-600 h-2.5 rounded-full"
+                className="bg-[#081c44] h-2 rounded-full"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -102,16 +107,13 @@ export default async function ProductDetailPage({ params }: Props) {
       </div>
 
       {/* CTA fissa in basso */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#f8f9fc] border-t border-gray-200">
-        <form action="/api/quick-buy" method="POST" className="p-4 flex">
-          <input type="hidden" name="pid" value={slug} />
-          <input type="hidden" name="pkg" value="base" />
-          <button
-            type="submit"
-            className="flex w-full items-center justify-center rounded-xl h-12 px-5 bg-[#081c44] text-[#f8f9fc] text-base font-bold"
-          >
-            Attiva Pass
-          </button>
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4">
+        <form action="/api/quick-buy" method="POST">
+            <input type="hidden" name="slug" value={product.slug} />
+            <input type="hidden" name="package_key" value="base" />
+            <button type="submit" className="w-full h-12 bg-[#081c44] text-white rounded-lg font-bold">
+                Attiva Pass
+            </button>
         </form>
       </div>
     </div>
