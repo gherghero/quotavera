@@ -8,6 +8,8 @@ import { formatCurrencyEUR } from '@/lib/format';
 type Props = {
   product: Product;
   packages: Package[];
+  initialPackageKey?: string;
+  initialEmail?: string;
 };
 
 const packageLabels: Record<string, string> = {
@@ -16,10 +18,16 @@ const packageLabels: Record<string, string> = {
   plus: 'Plus',
 };
 
-export default function BuyForm({ product, packages }: Props) {
+export default function BuyForm({ product, packages, initialPackageKey, initialEmail }: Props) {
   const router = useRouter();
-  const [selectedPackageKey, setSelectedPackageKey] = useState<string>(packages[0]?.package_key || '');
-  const [email, setEmail] = useState('');
+  const [selectedPackageKey, setSelectedPackageKey] = useState<string>(() => {
+    const validKeys = packages.map(p => p.package_key);
+    if (initialPackageKey && (validKeys as string[]).includes(initialPackageKey)) {
+      return initialPackageKey as 'base' | 'smart' | 'plus';
+    }
+    return packages[0]?.package_key || '';
+  });
+  const [email, setEmail] = useState(initialEmail || '');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

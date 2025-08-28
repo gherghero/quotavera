@@ -88,7 +88,6 @@ export default async function ProductDetailPage({ params }: Props) {
     </button>
   </form>
 </div>
-      </div>
     </div>
   );
 }
