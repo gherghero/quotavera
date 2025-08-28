@@ -1,74 +1,91 @@
-import Html from '@/components/Html';
+import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import { createBrowserClient } from '@/lib/supabase';
+import { formatCurrencyEUR, progressPct } from '@/lib/format';
 
-export default function BuyPage() {
-  const html = `
-<div
-  class="relative flex size-full min-h-screen flex-col bg-[#f8f9fc] justify-between group/design-root overflow-x-hidden"
-  style="--radio-dot-svg: url('data:image/svg+xml,%3csvg viewBox=%270 0 16 16%27 fill=%27rgb(8,28,68)%27 xmlns=%27http://www.w3.org/2000/svg%27%3e%3ccircle cx=%278%27 cy=%278%27 r=%273%27/%3e%3c/svg%3e'); font-family: Inter, &quot;Noto Sans&quot;, sans-serif;"
->
-  <div>
-    <div class="flex absolute top-0 left-0 h-full w-full flex-col justify-end items-stretch bg-[#141414]/40">
-      <div class="flex flex-col items-stretch bg-[#f8f9fc]">
-        <button class="flex h-5 w-full items-center justify-center"><div class="h-1 w-9 rounded-full bg-[#d0d7e7]"></div></button>
-        <div class="flex-1">
-          <h1 class="text-[#0e121b] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 text-left pb-3 pt-5">Seleziona il Tuo Pacchetto</h1>
-          <div class="flex flex-col gap-3 p-4">
-            <label class="flex items-center gap-4 rounded-xl border border-solid border-[#d0d7e7] p-[15px] flex-row-reverse">
-              <input
-                type="radio"
-                class="h-5 w-5 border-2 border-[#d0d7e7] bg-transparent text-transparent checked:border-[#081c44] checked:bg-[image:--radio-dot-svg] focus:outline-none focus:ring-0 focus:ring-offset-0 checked:focus:border-[#081c44]"
-                name="pack"
-                checked=""
-              />
-              <div class="flex grow flex-col">
-                <p class="text-[#0e121b] text-sm font-medium leading-normal">Base</p>
-                <p class="text-[#4e6797] text-sm font-normal leading-normal">1 attivazione</p>
-              </div>
-            </label>
-            <label class="flex items-center gap-4 rounded-xl border border-solid border-[#d0d7e7] p-[15px] flex-row-reverse">
-              <input
-                type="radio"
-                class="h-5 w-5 border-2 border-[#d0d7e7] bg-transparent text-transparent checked:border-[#081c44] checked:bg-[image:--radio-dot-svg] focus:outline-none focus:ring-0 focus:ring-offset-0 checked:focus:border-[#081c44]"
-                name="pack"
-              />
-              <div class="flex grow flex-col">
-                <p class="text-[#0e121b] text-sm font-medium leading-normal">Smart</p>
-                <p class="text-[#4e6797] text-sm font-normal leading-normal">3 attivazioni</p>
-              </div>
-            </label>
-            <label class="flex items-center gap-4 rounded-xl border border-solid border-[#d0d7e7] p-[15px] flex-row-reverse">
-              <input
-                type="radio"
-                class="h-5 w-5 border-2 border-[#d0d7e7] bg-transparent text-transparent checked:border-[#081c44] checked:bg-[image:--radio-dot-svg] focus:outline-none focus:ring-0 focus:ring-offset-0 checked:focus:border-[#081c44]"
-                name="pack"
-              />
-              <div class="flex grow flex-col">
-                <p class="text-[#0e121b] text-sm font-medium leading-normal">Plus</p>
-                <p class="text-[#4e6797] text-sm font-normal leading-normal">5 attivazioni</p>
-              </div>
-            </label>
+// Re-enable caching after data is dynamic
+export const revalidate = 0;
+
+type Props = {
+  params: { slug: string };
+};
+
+export default async function ProductDetailPage({ params }: Props) {
+  const { slug } = params;
+  const supabase = createBrowserClient();
+
+  const { data: product, error: productError } = await supabase
+    .from('products')
+    .select('*')
+    .eq('slug', slug)
+    .single();
+
+  if (productError || !product) {
+    console.error(`Product with slug "${slug}" not found.`, productError);
+    notFound();
+  }
+
+  const progress = progressPct(product.activations_count, product.target_activations);
+
+  return (
+    <div className="relative flex size-full min-h-screen flex-col bg-[#f8f9fc] justify-between font-sans">
+      <div className="pb-32">
+        {/* Header */}
+        <div className="flex items-center p-4">
+          <Link href="/" className="text-[#0e121b] p-2 -ml-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256">
+              <path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"></path>
+            </svg>
+          </Link>
+          <h1 className="text-lg font-bold text-center flex-1 pr-6">{product.name}</h1>
+        </div>
+
+        {/* Image Gallery */}
+        <div className="w-full bg-center bg-no-repeat aspect-square bg-cover" style={{ backgroundImage: `url("${product.cover_url}")` }}></div>
+
+        <div className="p-4 space-y-4">
+          {/* Product Info */}
+          <div className="grid grid-cols-2 gap-4 text-center">
+            <div>
+              <p className="text-sm text-[#4e6797]">Valore Stimato</p>
+              <p className="font-bold text-lg">{formatCurrencyEUR(product.est_value_eur)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-[#4e6797]">Consegna Stimata</p>
+              <p className="font-bold text-lg">{product.eta_low_days}-{product.eta_high_days} giorni</p>
+            </div>
           </div>
-          <div class="flex items-center gap-4 bg-[#f8f9fc] px-4 min-h-14 justify-between">
-            <p class="text-[#0e121b] text-base font-normal leading-normal flex-1 truncate">Totale</p>
-            <div class="shrink-0"><p class="text-[#0e121b] text-base font-normal leading-normal">10 €</p></div>
+
+          {/* Progress Bar */}
+          <div>
+            <h3 className="font-bold text-lg mb-2">Progresso</h3>
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
+            </div>
+            <p className="text-sm text-center mt-2">
+              {product.activations_count} / {product.target_activations} attivazioni ({Math.round(progress)}%)
+            </p>
+          </div>
+
+          {/* Description */}
+          <div>
+            <h3 className="font-bold text-lg mb-2">Descrizione</h3>
+            <p className="text-[#4e6797]">{product.description}</p>
           </div>
         </div>
       </div>
+
+      {/* Bottom Action Button */}
+      <div className="fixed bottom-0 left-0 right-0 bg-[#f8f9fc] border-t border-gray-200">
+        <div className="p-4">
+          <Link
+            href={`/product/${slug}/buy`}
+            className="flex w-full items-center justify-center rounded-xl h-12 px-5 bg-[#081c44] text-[#f8f9fc] text-base font-bold"
+          >
+            Attiva Pass
+          </Link>
+        </div>
+      </div>
     </div>
-  </div>
-  <div>
-    <div class="flex px-4 py-3">
-      <a
-        href="/checkout"
-        class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-xl h-12 px-5 flex-1 bg-[#081c44] text-[#f8f9fc] text-base font-bold leading-normal tracking-[0.015em]"
-      >
-        <span class="truncate">Procedi al Pagamento</span>
-      </a>
-    </div>
-    <p class="text-[#4e6797] text-sm font-normal leading-normal pb-3 pt-1 px-4 text-center underline">Dettagli Pacchetto</p>
-    <div class="h-5 bg-[#f8f9fc]"></div>
-  </div>
-</div>
-  `;
-  return <Html html={html} />;
+  );
 }
