@@ -1,3 +1,4 @@
+import React from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createServerSupabase } from '@/lib/supabase-server';
@@ -10,7 +11,6 @@ type Props = {
   params: { slug: string };
 };
 
-// Tipi minimi per il record prodotto
 type Product = {
   id: string;
   slug: string;
@@ -29,21 +29,19 @@ export default async function ProductDetailPage({ params }: Props) {
   const { slug } = params;
   const supabase = createServerSupabase();
 
-  const { data: product, error: productError } = await supabase
+  const { data: productRaw, error: productError } = await supabase
     .from('products')
     .select('*')
     .eq('slug', slug)
-    .single<Product>();
+    .single(); // ← niente <Product> qui (causava il parse error in TSX)
 
-  if (productError || !product) {
+  if (productError || !productRaw) {
     console.error(`Product with slug "${slug}" not found.`, productError);
     notFound();
   }
 
-  const progress = progressPct(
-    product.activations_count,
-    product.target_activations
-  );
+  const product = productRaw as Product;
+  const progress = progressPct(product.activations_count, product.target_activations);
 
   return (
     <div className="relative flex size-full min-h-screen flex-col bg-[#f8f9fc] justify-between font-sans">
