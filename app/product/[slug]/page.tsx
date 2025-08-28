@@ -101,18 +101,16 @@ export default async function ProductDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* CTA fissa in basso */}
+      {/* Bottom Action Button */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#f8f9fc] border-t border-gray-200">
-        <form action="/api/quick-buy" method="POST" className="p-4 flex">
-          <input type="hidden" name="pid" value={slug} />
-          <input type="hidden" name="pkg" value="base" />
-          <button
-            type="submit"
+        <div className="p-4">
+          <Link
+            href={`/checkout?pid=${slug}`}
             className="flex w-full items-center justify-center rounded-xl h-12 px-5 bg-[#081c44] text-[#f8f9fc] text-base font-bold"
           >
             Attiva Pass
-          </button>
-        </form>
+          </Link>
+        </div>
       </div>
     </div>
   );

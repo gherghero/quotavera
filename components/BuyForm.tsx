@@ -2,120 +2,110 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Product, Package } from '@/lib/types';
-import { formatCurrencyEUR } from '@/lib/format';
+
+type PkgKey = 'base' | 'smart' | 'plus';
+type Pkg = { package_key: PkgKey; entries: number; price_eur: number };
 
 type Props = {
-  product: Product;
-  packages: Package[];
+  slug: string;
+  packages: Pkg[];
+  defaultPkg?: PkgKey;
 };
 
-const packageLabels: Record<string, string> = {
-  base: 'Base',
-  smart: 'Smart',
-  plus: 'Plus',
-};
-
-export default function BuyForm({ product, packages }: Props) {
-  const router = useRouter();
-  const [selectedPackageKey, setSelectedPackageKey] = useState<string>(packages[0]?.package_key || '');
+export default function BuyForm({ slug, packages, defaultPkg = 'base' }: Props) {
+  const [pkg, setPkg] = useState<PkgKey>(defaultPkg);
   const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  const selectedPackage = packages.find(p => p.package_key === selectedPackageKey);
+  const selected = packages.find((p) => p.package_key === pkg);
+  const total = selected?.price_eur ?? 0;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
-
     try {
-      const response = await fetch('/api/quick-buy', {
+      const res = await fetch('/api/quick-buy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          slug: product.slug,
-          package_key: selectedPackageKey,
+          slug,
+          package_key: pkg,
           email: email || undefined,
         }),
       });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Something went wrong');
-      }
-
-      if (result.redirect) {
-        router.push(result.redirect);
-      } else {
-        // Fallback if no redirect URL is provided
-        router.push('/wallet?success=1');
-      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || 'Ordine non riuscito');
+      if (data?.redirect) router.push(data.redirect);
+      else router.push('/wallet?success=1');
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Errore inatteso');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  };
+  }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col h-full justify-between">
-      <div>
-        <h1 className="text-[#0e121b] text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 text-left pb-3 pt-5">
-          Seleziona il Tuo Pacchetto
-        </h1>
-        <div className="flex flex-col gap-3 p-4">
-          {packages.map((pkg) => (
-            <label key={pkg.package_key} className="flex items-center gap-4 rounded-xl border border-solid border-[#d0d7e7] p-[15px] flex-row-reverse cursor-pointer">
-              <input
-                type="radio"
-                name="pack"
-                value={pkg.package_key}
-                checked={selectedPackageKey === pkg.package_key}
-                onChange={(e) => setSelectedPackageKey(e.target.value)}
-                className="h-5 w-5 border-2 border-[#d0d7e7] bg-transparent text-transparent checked:border-[#081c44] checked:bg-[image:--radio-dot-svg] focus:outline-none focus:ring-0 focus:ring-offset-0"
-              />
-              <div className="flex grow flex-col">
-                <p className="text-[#0e121b] text-sm font-medium leading-normal">{packageLabels[pkg.package_key]}</p>
-                <p className="text-[#4e6797] text-sm font-normal leading-normal">{pkg.entries} attivazioni</p>
-              </div>
-              <p className="text-[#0e121b] text-sm font-bold">{formatCurrencyEUR(pkg.price_eur)}</p>
-            </label>
-          ))}
-        </div>
-        <div className="px-4 pt-2">
-            <label htmlFor="email" className="text-[#0e121b] text-sm font-medium">Email (Opzionale)</label>
-            <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Per ricevere la ricevuta"
-                className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            />
-        </div>
-        <div className="flex items-center gap-4 bg-[#f8f9fc] px-4 min-h-14 justify-between mt-4">
-          <p className="text-[#0e121b] text-base font-normal leading-normal flex-1 truncate">Totale</p>
-          <div className="shrink-0">
-            <p className="text-[#0e121b] text-base font-bold">
-              {selectedPackage ? formatCurrencyEUR(selectedPackage.price_eur) : 'Seleziona un pacchetto'}
-            </p>
-          </div>
-        </div>
-        {error && <p className="text-red-500 text-sm px-4 mt-2">{error}</p>}
+    <form onSubmit={onSubmit} className="p-4 space-y-4">
+      <fieldset className="space-y-3">
+        {(['base', 'smart', 'plus'] as PkgKey[])
+          .filter((k) => packages.some((p) => p.package_key === k))
+          .map((k) => {
+            const p = packages.find((x) => x.package_key === k)!;
+            return (
+              <label key={k} className="flex items-center gap-4 rounded-xl border border-[#d0d7e7] p-4">
+                <input
+                  type="radio"
+                  name="package"
+                  className="h-5 w-5"
+                  checked={pkg === k}
+                  onChange={() => setPkg(k)}
+                />
+                <div className="flex grow items-center justify-between">
+                  <div className="flex flex-col">
+                    <p className="text-[#0e121b] text-sm font-medium leading-normal">
+                      {k === 'base' ? 'Base' : k === 'smart' ? 'Smart' : 'Plus'}
+                    </p>
+                    <p className="text-[#4e6797] text-sm leading-normal">{p.entries} attivazione{p.entries > 1 ? 'i' : ''}</p>
+                  </div>
+                  <div className="text-[#0e121b] text-sm font-medium">{p.price_eur.toFixed(2)} €</div>
+                </div>
+              </label>
+            );
+          })}
+      </fieldset>
+
+      <div className="space-y-2">
+        <label className="block text-sm text-[#0e121b]">Email (opzionale)</label>
+        <input
+          type="email"
+          placeholder="name@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full rounded-xl h-12 p-3 bg-[#e7ebf3] text-[#0e121b] outline-none border-none"
+        />
       </div>
 
-      <div className="p-4 border-t border-gray-200">
-        <button
-          type="submit"
-          disabled={isLoading || !selectedPackage}
-          className="flex w-full items-center justify-center rounded-xl h-12 px-5 bg-[#081c44] text-[#f8f9fc] text-base font-bold disabled:bg-gray-400"
-        >
-          {isLoading ? 'Processing...' : 'Procedi al Pagamento'}
-        </button>
+      <div className="flex items-center justify-between">
+        <p className="text-base">Totale</p>
+        <p className="text-base font-semibold">{total.toFixed(2)} €</p>
       </div>
+
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+
+      <button
+        type="submit"
+        disabled={loading || !selected}
+        className="flex w-full items-center justify-center rounded-xl h-12 px-5 bg-[#081c44] text-[#f8f9fc] text-base font-bold disabled:opacity-60"
+      >
+        {loading ? 'Attivazione…' : 'Paga e attiva'}
+      </button>
+
+      <p className="text-[#4e6797] text-xs text-center">
+        Procedendo, accetti Termini &amp; Condizioni del concorso. Il bene digitale è incluso con l’acquisto.
+      </p>
     </form>
   );
 }

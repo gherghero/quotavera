@@ -94,6 +94,11 @@ export async function POST(req: NextRequest) {
     }
     orderId = newOrder.id;
 
+    if (!orderId) {
+      // Should not happen if createOrderError is properly handled, but TS needs it
+      throw new Error('Order ID could not be created.');
+    }
+
     const { error: updateOrderStatusError } = await supabase
       .from('orders')
       .update({ status: 'paid' })

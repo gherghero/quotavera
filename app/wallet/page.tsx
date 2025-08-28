@@ -27,7 +27,7 @@ export default async function WalletPage() {
           </Link>
         </div>
         <div className="sticky bottom-0 left-0 right-0">
-          <BottomNav active="wallet" />
+          <BottomNav />
           <div className="h-5 bg-[#f8f9fc]"></div>
         </div>
       </div>
@@ -111,7 +111,7 @@ export default async function WalletPage() {
       </div>
 
       <div className="sticky bottom-0 left-0 right-0">
-        <BottomNav active="wallet" />
+        <BottomNav />
         <div className="h-5 bg-[#f8f9fc]"></div>
       </div>
     </div>
