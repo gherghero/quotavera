@@ -96,7 +96,9 @@ export default async function ProductDetailPage({ params }: Props) {
           {/* Descrizione */}
           <div>
             <h3 className="font-bold text-lg mb-2">Descrizione</h3>
-            <p className="text-[#4e6797]">{product.description}</p>
+            <div className="text-[#4e6797] whitespace-pre-line">
+  {product.description}
+</div>
           </div>
         </div>
       </div>
