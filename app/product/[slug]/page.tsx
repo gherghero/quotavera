@@ -3,8 +3,9 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createServerSupabase } from '@/lib/supabase-server';
 import { formatCurrencyEUR, progressPct } from '@/lib/format';
+import BuySheet from './BuySheet';
 
-// Dati dinamici: no cache
+// Disabilita cache per dati dinamici
 export const revalidate = 0;
 
 type Props = {
@@ -25,10 +26,46 @@ type Product = {
   status: string;
 };
 
+type Pkg = {
+  package_key: 'base' | 'smart' | 'plus' | string;
+  price_eur: number;
+  entries: number;
+};
+
+// Utility: renderizza la descrizione con paragrafi e bullet
+function renderDescription(desc: string) {
+  // Split per blocchi vuoti
+  const blocks = (desc || '').trim().split(/\n{2,}/);
+
+  return (
+    <div className="text-[#0e121b] space-y-3">
+      {blocks.map((block, i) => {
+        const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+        const isList = lines.every((l) => l.startsWith('•'));
+        if (isList) {
+          return (
+            <ul key={i} className="list-disc pl-5 space-y-1 text-[#4e6797]">
+              {lines.map((l, j) => (
+                <li key={j}>{l.replace(/^•\s?/, '')}</li>
+              ))}
+            </ul>
+          );
+        }
+        return (
+          <p key={i} className="text-[#4e6797] leading-relaxed">
+            {block}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 export default async function ProductDetailPage({ params }: Props) {
   const { slug } = params;
   const supabase = createServerSupabase();
 
+  // 1) Prodotto
   const { data: productRaw, error: productError } = await supabase
     .from('products')
     .select('*')
@@ -41,6 +78,20 @@ export default async function ProductDetailPage({ params }: Props) {
   }
 
   const product = productRaw as Product;
+
+  // 2) Pacchetti collegati
+  const { data: pkgRows, error: pkgError } = await supabase
+    .from('packages')
+    .select('package_key, price_eur, entries')
+    .eq('product_id', product.id)
+    .order('price_eur', { ascending: true });
+
+  if (pkgError) {
+    console.error('Error loading packages:', pkgError);
+  }
+
+  const packages = (pkgRows || []) as Pkg[];
+
   const progress = progressPct(product.activations_count, product.target_activations);
 
   return (
@@ -96,24 +147,13 @@ export default async function ProductDetailPage({ params }: Props) {
           {/* Descrizione */}
           <div>
             <h3 className="font-bold text-lg mb-2">Descrizione</h3>
-            <div className="text-[#4e6797] whitespace-pre-line">
-              {product.description}
-            </div>
+            {renderDescription(product.description)}
           </div>
         </div>
       </div>
 
-      {/* CTA fissa in basso: porta alla selezione pacchetti */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#f8f9fc] border-t border-gray-200">
-        <div className="p-4">
-          <Link
-            href={`/checkout?pid=${encodeURIComponent(product.slug)}`}
-            className="flex w-full items-center justify-center rounded-xl h-12 px-5 bg-[#081c44] text-[#f8f9fc] text-base font-bold"
-          >
-            Attiva Pass
-          </Link>
-        </div>
-      </div>
+      {/* Sheet con i pacchetti + CTA */}
+      <BuySheet slug={product.slug} packages={packages} />
     </div>
   );
 }
