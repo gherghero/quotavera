@@ -1,99 +1,230 @@
-import Html from '@/components/Html';
+import { notFound, redirect } from 'next/navigation';
+import Link from 'next/link';
+import { createServerSupabase } from '@/lib/supabase-server';
+import { formatCurrencyEUR } from '@/lib/format';
 
-export default function CheckoutPage() {
-  const html = `
-<div
-  class="relative flex size-full min-h-screen flex-col bg-[#f8f9fc] justify-between group/design-root overflow-x-hidden"
-  style='font-family: Inter, "Noto Sans", sans-serif;'
->
-  <div>
-    <div class="flex items-center bg-[#f8f9fc] p-4 pb-2 justify-between">
-      <div class="text-[#0e121b] flex size-12 shrink-0 items-center" data-icon="X" data-size="24px" data-weight="regular">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24px" height="24px" fill="currentColor" viewBox="0 0 256 256">
-          <path
-            d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"
-          ></path>
-        </svg>
-      </div>
-      <h2 class="text-[#0e121b] text-lg font-bold leading-tight tracking-[-0.015em] flex-1 text-center pr-12">Checkout</h2>
-    </div>
-    <div class="p-4">
-      <div class="flex items-stretch justify-between gap-4 rounded-xl">
-        <div class="flex flex-col gap-1 flex-[2_2_0px]">
-          <p class="text-[#4e6797] text-sm font-normal leading-normal">1x</p>
-          <p class="text-[#0e121b] text-base font-bold leading-tight">Rolex Submariner</p>
-          <p class="text-[#4e6797] text-sm font-normal leading-normal">Valore stimato: €12.000,00</p>
+export const revalidate = 0;
+
+type SearchParams = {
+  pid?: string; // product slug
+  pkg?: string; // pre-selezione opzionale: base | smart | plus
+};
+
+type Product = {
+  id: string;
+  slug: string;
+  name: string;
+  cover_url: string;
+  est_value_eur: number;
+};
+
+type Pkg = {
+  package_key: 'base' | 'smart' | 'plus' | string;
+  price_eur: number;
+  entries: number;
+};
+
+function humanLabel(key: string): string {
+  switch (key) {
+    case 'base': return 'Base';
+    case 'smart': return 'Smart';
+    case 'plus': return 'Plus';
+    default: return key;
+  }
+}
+
+export default async function CheckoutPage({ searchParams }: { searchParams: SearchParams }) {
+  const pid = searchParams.pid;
+  if (!pid) redirect('/');
+
+  const supabase = createServerSupabase();
+
+  const { data: product, error: pErr } = await supabase
+    .from('products')
+    .select('id, slug, name, cover_url, est_value_eur')
+    .eq('slug', pid)
+    .single();
+
+  if (pErr || !product) {
+    console.error('Checkout: prodotto non trovato', pErr);
+    notFound();
+  }
+
+  const { data: pkgsRaw, error: kErr } = await supabase
+    .from('packages')
+    .select('package_key, price_eur, entries')
+    .eq('product_id', product.id)
+    .order('price_eur', { ascending: true });
+
+  if (kErr) {
+    console.error('Checkout: errore caricando pacchetti', kErr);
+  }
+
+  const packages: Pkg[] = pkgsRaw ?? [];
+  if (packages.length === 0) {
+    // fallback: mostra info minime
+    return (
+      <div className="min-h-screen bg-[#f8f9fc]">
+        <div className="flex items-center p-4">
+          <Link href="/" className="text-[#0e121b] p-2 -ml-2" aria-label="Torna alla home">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256">
+              <path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"></path>
+            </svg>
+          </Link>
+          <h1 className="text-lg font-bold text-center flex-1 pr-6">Checkout</h1>
         </div>
-        <div
-          class="w-full bg-center bg-no-repeat aspect-video bg-cover rounded-xl flex-1"
-          style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBaB927K0D4Zn9R66pWHBicnxxoalUWm9_zwfuu6p5pUgcK0moAk9vI0wTY3FAz9Ky5aQ2T-bg7UM0HI-neTtyzEGNaRMc7d3ZJNIzKesuDFk6j7PleF4ykFB4i1dnuB85WXC_YmCIjd2kjAkWOn3xbiZjOkZ9YZRcHLb7llu_HdwkDfNqdNrYXbPYb_RCOJZevL_OGY1gohVpZu0EAlhTItF_6FmIFh87rYp-uUuaZoHaqEz_HBqfvxn5Y1xIFmcttkNmMHwlQcw");'
-        ></div>
+        <div className="p-4 space-y-4">
+          <div className="rounded-xl bg-white p-4 shadow">
+            <div className="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-lg"
+                 style={{ backgroundImage: `url("${product.cover_url}")` }} />
+            <h2 className="text-xl font-bold mt-4">{product.name}</h2>
+            <p className="text-[#4e6797]">Valore stimato: {formatCurrencyEUR(product.est_value_eur)}</p>
+            <p className="text-sm text-red-600 mt-2">Nessun pacchetto configurato per questo prodotto.</p>
+          </div>
+        </div>
       </div>
+    );
+  }
+
+  const initialKey = (searchParams.pkg as string) || packages[0]?.package_key || 'base';
+
+  // Render server + piccola logica client via <script> inline per la selezione/submit JSON
+  return (
+    <div className="min-h-screen bg-[#f8f9fc]">
+      {/* Header */}
+      <div className="flex items-center p-4">
+        <Link href="/" className="text-[#0e121b] p-2 -ml-2" aria-label="Torna alla home">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 256 256">
+            <path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"></path>
+          </svg>
+        </Link>
+        <h1 className="text-lg font-bold text-center flex-1 pr-6">Checkout</h1>
+      </div>
+
+      <div className="p-4 space-y-5 pb-28">
+        {/* Riepilogo prodotto */}
+        <div className="rounded-2xl bg-white p-4 shadow">
+          <div className="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-xl"
+               style={{ backgroundImage: `url("${product.cover_url}")` }} />
+          <h2 className="text-xl font-bold mt-4">{product.name}</h2>
+          <p className="text-[#4e6797]">Valore stimato: {formatCurrencyEUR(product.est_value_eur)}</p>
+        </div>
+
+        {/* Selettore pacchetti */}
+        <div className="space-y-3" id="pkg-list">
+          <h3 className="font-bold text-lg">Scegli il pacchetto</h3>
+
+          {packages.map((pk) => (
+            <button
+              key={pk.package_key}
+              type="button"
+              data-pkg={pk.package_key}
+              className="pkg-card w-full text-left rounded-2xl border border-gray-200 bg-white p-4 shadow hover:border-[#081c44] focus:outline-none"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-base font-bold">{humanLabel(pk.package_key)}</div>
+                  <div className="text-sm text-[#4e6797]">Include {pk.entries} ingresso{pk.entries > 1 ? 'i' : ''}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-base font-bold">{formatCurrencyEUR(pk.price_eur)}</div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* CTA fissa */}
+      <div className="fixed bottom-0 left-0 right-0 bg-[#f8f9fc] border-t border-gray-200">
+        <div className="p-4 flex gap-3">
+          <Link
+            href={`/product/${encodeURIComponent(product.slug)}`}
+            className="flex-1 h-12 rounded-xl border border-gray-300 bg-white text-[#081c44] font-semibold flex items-center justify-center"
+          >
+            Indietro
+          </Link>
+          <button
+            id="confirmBtn"
+            type="button"
+            className="flex-[2] h-12 rounded-xl bg-[#081c44] text-white font-bold"
+            data-initial={initialKey}
+            data-slug={product.slug}
+          >
+            Conferma e attiva
+          </button>
+        </div>
+      </div>
+
+      {/* Script leggero per selezione e submit JSON a /api/quick-buy */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+(function(){
+  const pkgCards = Array.from(document.querySelectorAll('.pkg-card'));
+  const confirmBtn = document.getElementById('confirmBtn');
+  let selected = confirmBtn?.getAttribute('data-initial') || '${initialKey}';
+
+  function updateSelection() {
+    pkgCards.forEach(el => {
+      const key = el.getAttribute('data-pkg');
+      if (key === selected) {
+        el.classList.add('ring-2','ring-[#081c44]','border-[#081c44]');
+      } else {
+        el.classList.remove('ring-2','ring-[#081c44]','border-[#081c44]');
+      }
+    });
+  }
+
+  pkgCards.forEach(el => {
+    el.addEventListener('click', () => {
+      selected = el.getAttribute('data-pkg') || selected;
+      updateSelection();
+    });
+  });
+
+  updateSelection();
+
+  async function submitJSON() {
+    const slug = confirmBtn?.getAttribute('data-slug');
+    if (!slug) return;
+
+    confirmBtn.setAttribute('disabled','true');
+    confirmBtn.textContent = 'Attivazione...';
+
+    try {
+      const res = await fetch('/api/quick-buy', {
+        method: 'POST',
+        headers: { 'content-type':'application/json' },
+        body: JSON.stringify({ slug, package_key: selected })
+      });
+
+      const out = await res.json().catch(() => ({}));
+      if (out && out.redirect) {
+        window.location.href = out.redirect;
+        return;
+      }
+      if (out && out.ok && out.wallet_url) {
+        window.location.href = out.wallet_url;
+        return;
+      }
+      // fallback
+      alert('Richiesta inviata. Verifica il wallet.');
+      window.location.href = '/wallet';
+    } catch (e) {
+      console.error(e);
+      alert('Si è verificato un errore, riprova.');
+    } finally {
+      confirmBtn.removeAttribute('disabled');
+      confirmBtn.textContent = 'Conferma e attiva';
+    }
+  }
+
+  confirmBtn?.addEventListener('click', submitJSON);
+})();
+          `,
+        }}
+      />
     </div>
-    <h3 class="text-[#0e121b] text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-4">Metodo di pagamento</h3>
-    <div class="flex items-center gap-4 bg-[#f8f9fc] px-4 min-h-14">
-      <div class="bg-center bg-no-repeat aspect-video bg-contain h-6 w-10 shrink-0" style='background-image: url("/mastercard.svg");'></div>
-      <p class="text-[#0e121b] text-base font-normal leading-normal flex-1 truncate">Carta</p>
-    </div>
-    <div class="flex items-center gap-4 bg-[#f8f9fc] px-4 min-h-14">
-      <div class="bg-center bg-no-repeat aspect-video bg-contain h-6 w-10 shrink-0" style='background-image: url("/applepay.svg");'></div>
-      <p class="text-[#0e121b] text-base font-normal leading-normal flex-1 truncate">Apple Pay/Google Pay</p>
-    </div>
-    <div class="flex items-center gap-4 bg-[#f8f9fc] px-4 min-h-14">
-      <div class="bg-center bg-no-repeat aspect-video bg-contain h-6 w-10 shrink-0" style='background-image: url("/paypal.svg");'></div>
-      <p class="text-[#0e121b] text-base font-normal leading-normal flex-1 truncate">PayPal</p>
-    </div>
-    <h3 class="text-[#0e121b] text-lg font-bold leading-tight tracking-[-0.015em] px-4 pb-2 pt-4">Dettagli di pagamento</h3>
-    <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
-      <label class="flex flex-col min-w-40 flex-1">
-        <input
-          placeholder="Numero di carta"
-          class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-[#0e121b] focus:outline-0 focus:ring-0 border-none bg-[#e7ebf3] focus:border-none h-14 placeholder:text-[#4e6797] p-4 text-base font-normal leading-normal"
-          value=""
-        />
-      </label>
-    </div>
-    <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
-      <label class="flex flex-col min-w-40 flex-1">
-        <input
-          placeholder="MM/AA"
-          class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-[#0e121b] focus:outline-0 focus:ring-0 border-none bg-[#e7ebf3] focus:border-none h-14 placeholder:text-[#4e6797] p-4 text-base font-normal leading-normal"
-          value=""
-        />
-      </label>
-      <label class="flex flex-col min-w-40 flex-1">
-        <input
-          placeholder="CVV"
-          class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-[#0e121b] focus:outline-0 focus:ring-0 border-none bg-[#e7ebf3] focus:border-none h-14 placeholder:text-[#4e6797] p-4 text-base font-normal leading-normal"
-          value=""
-        />
-      </label>
-    </div>
-    <div class="flex max-w-[480px] flex-wrap items-end gap-4 px-4 py-3">
-      <label class="flex flex-col min-w-40 flex-1">
-        <input
-          placeholder="Nome sulla carta"
-          class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-[#0e121b] focus:outline-0 focus:ring-0 border-none bg-[#e7ebf3] focus:border-none h-14 placeholder:text-[#4e6797] p-4 text-base font-normal leading-normal"
-          value=""
-        />
-      </label>
-    </div>
-    <p class="text-[#4e6797] text-sm font-normal leading-normal pb-3 pt-1 px-4">Procedendo, accetti la nostra Informativa sulla privacy e i Termini di servizio.</p>
-  </div>
-  <div>
-    <div class="flex px-4 py-3">
-      <button
-        class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-xl h-12 px-5 flex-1 bg-[#081c44] text-[#f8f9fc] text-base font-bold leading-normal tracking-[0.015em]"
-      >
-        <span class="truncate">Paga e attiva</span>
-      </button>
-    </div>
-    <p class="text-[#4e6797] text-sm font-normal leading-normal pb-3 pt-1 px-4 text-center">
-      Riceverai una ricevuta e il tuo pass sarà disponibile nel tuo portafoglio digitale.
-    </p>
-    <div class="h-5 bg-[#f8f9fc]"></div>
-  </div>
-</div>
-  `;
-  return <Html html={html} />;
+  );
 }
