@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { createServerSupabase } from '@/lib/supabase-server';
 import { formatCurrencyEUR, progressPct } from '@/lib/format';
 
-// Disabilita cache per dati dinamici
+// Dati dinamici: no cache
 export const revalidate = 0;
 
 type Props = {
@@ -33,7 +33,7 @@ export default async function ProductDetailPage({ params }: Props) {
     .from('products')
     .select('*')
     .eq('slug', slug)
-    .single(); // ← niente <Product> qui (causava il parse error in TSX)
+    .single();
 
   if (productError || !productRaw) {
     console.error(`Product with slug "${slug}" not found.`, productError);
@@ -97,24 +97,22 @@ export default async function ProductDetailPage({ params }: Props) {
           <div>
             <h3 className="font-bold text-lg mb-2">Descrizione</h3>
             <div className="text-[#4e6797] whitespace-pre-line">
-  {product.description}
-</div>
+              {product.description}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* CTA fissa in basso */}
+      {/* CTA fissa in basso: porta alla selezione pacchetti */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#f8f9fc] border-t border-gray-200">
-        <form action="/api/quick-buy" method="POST" className="p-4 flex">
-          <input type="hidden" name="pid" value={slug} />
-          <input type="hidden" name="pkg" value="base" />
-          <button
-            type="submit"
+        <div className="p-4">
+          <Link
+            href={`/checkout?pid=${encodeURIComponent(product.slug)}`}
             className="flex w-full items-center justify-center rounded-xl h-12 px-5 bg-[#081c44] text-[#f8f9fc] text-base font-bold"
           >
             Attiva Pass
-          </button>
-        </form>
+          </Link>
+        </div>
       </div>
     </div>
   );
