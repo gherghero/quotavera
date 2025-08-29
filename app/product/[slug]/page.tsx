@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createServerSupabase } from '@/lib/supabase-server';
 import { formatCurrencyEUR, progressPct } from '@/lib/format';
+import { AttivaPassButton } from '@/components/AttivaPassButton';
 
 // Disabilita cache per dati dinamici
 export const revalidate = 0;
@@ -103,16 +104,9 @@ export default async function ProductDetailPage({ params }: Props) {
 
       {/* CTA fissa in basso */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#f8f9fc] border-t border-gray-200">
-        <form action="/api/quick-buy" method="POST" className="p-4 flex">
-          <input type="hidden" name="pid" value={slug} />
-          <input type="hidden" name="pkg" value="base" />
-          <button
-            type="submit"
-            className="flex w-full items-center justify-center rounded-xl h-12 px-5 bg-[#081c44] text-[#f8f9fc] text-base font-bold"
-          >
-            Attiva Pass
-          </button>
-        </form>
+        <div className="p-4">
+          <AttivaPassButton slug={slug} pkgKey="base" />
+        </div>
       </div>
     </div>
   );

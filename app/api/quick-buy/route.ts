@@ -30,9 +30,9 @@ export async function POST(req: NextRequest) {
 
       const url = new URL(
         `/checkout?pid=${encodeURIComponent(slug)}&pkg=${encodeURIComponent(pkg)}`,
-        req.url
+        req.nextUrl
       );
-      return NextResponse.redirect(url, 307);
+      return NextResponse.redirect(url);
     } catch {
       // se fallisce, si continua con la modalità JSON sotto
     }
@@ -148,4 +148,11 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ error: 'An unexpected error occurred.', details: error.message }, { status: 500 });
   }
+}
+
+// opzionale per GET
+export async function GET(req: NextRequest) {
+  const pid = req.nextUrl.searchParams.get('pid');
+  const pkg = req.nextUrl.searchParams.get('pkg');
+  return NextResponse.redirect(new URL(`/checkout?pid=${encodeURIComponent(String(pid))}&pkg=${encodeURIComponent(String(pkg))}`, req.nextUrl));
 }
