@@ -3,8 +3,9 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createServerSupabase } from '@/lib/supabase-server';
 import { formatCurrencyEUR, progressPct } from '@/lib/format';
+import BuySheet from './BuySheet';
 
-// Dati dinamici: no cache
+// Disabilita cache per dati dinamici
 export const revalidate = 0;
 
 type Props = {
@@ -25,6 +26,61 @@ type Product = {
   status: string;
 };
 
+type Pkg = {
+  package_key: string;
+  price_eur: number;
+  entries: number;
+};
+
+// Render “descrizione” in paragrafi e liste
+function renderDescription(desc: string) {
+  const lines = (desc ?? '').split('\n');
+  const blocks: React.ReactNode[] = [];
+  let listBuf: string[] = [];
+  let inList = false;
+
+  const pushList = () => {
+    if (listBuf.length) {
+      const idx = blocks.length;
+      blocks.push(
+        <ul key={`ul-${idx}`} className="list-disc pl-6 space-y-1 text-[#4e6797]">
+          {listBuf.map((item, i) => (
+            <li key={`li-${idx}-${i}`}>{item}</li>
+          ))}
+        </ul>
+      );
+      listBuf = [];
+    }
+  };
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    const isBullet = line.startsWith('•') || line.startsWith('- ');
+    if (isBullet) {
+      inList = true;
+      listBuf.push(line.replace(/^•\s?/, '').replace(/^-+\s?/, '').trim());
+      continue;
+    }
+    if (inList) {
+      pushList();
+      inList = false;
+    }
+    if (line.length) {
+      const idx = blocks.length;
+      blocks.push(
+        <p key={`p-${idx}`} className="text-[#4e6797] mb-3">
+          {line}
+        </p>
+      );
+    } else {
+      // Riga vuota = spazio tra paragrafi
+      blocks.push(<div key={`sp-${blocks.length}`} className="h-2" />);
+    }
+  }
+  if (inList) pushList();
+  return <>{blocks}</>;
+}
+
 export default async function ProductDetailPage({ params }: Props) {
   const { slug } = params;
   const supabase = createServerSupabase();
@@ -42,6 +98,18 @@ export default async function ProductDetailPage({ params }: Props) {
 
   const product = productRaw as Product;
   const progress = progressPct(product.activations_count, product.target_activations);
+
+  // Recupera i pacchetti dal DB (base/smart/plus)
+  const { data: packagesData, error: packagesError } = await supabase
+    .from('packages')
+    .select('package_key, price_eur, entries')
+    .eq('product_id', product.id)
+    .order('price_eur', { ascending: true });
+
+  if (packagesError) {
+    console.error('Packages load error:', packagesError);
+  }
+  const packages = (packagesData ?? []) as Pkg[];
 
   return (
     <div className="relative flex size-full min-h-screen flex-col bg-[#f8f9fc] justify-between font-sans">
@@ -96,24 +164,13 @@ export default async function ProductDetailPage({ params }: Props) {
           {/* Descrizione */}
           <div>
             <h3 className="font-bold text-lg mb-2">Descrizione</h3>
-            <div className="text-[#4e6797] whitespace-pre-line">
-              {product.description}
-            </div>
+            {renderDescription(product.description)}
           </div>
         </div>
       </div>
 
-      {/* CTA fissa in basso: porta alla selezione pacchetti */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#f8f9fc] border-t border-gray-200">
-        <div className="p-4">
-          <Link
-            href={`/checkout?pid=${encodeURIComponent(product.slug)}`}
-            className="flex w-full items-center justify-center rounded-xl h-12 px-5 bg-[#081c44] text-[#f8f9fc] text-base font-bold"
-          >
-            Attiva Pass
-          </Link>
-        </div>
-      </div>
+      {/* Bottom sheet con i pacchetti */}
+      <BuySheet slug={product.slug} packages={packages} />
     </div>
   );
 }
