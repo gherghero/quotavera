@@ -2,8 +2,9 @@ import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import CheckoutSheet from '@/components/CheckoutSheet';
+import BottomNav from '@/components/BottomNav';
 import { createServerSupabase } from '@/lib/supabase-server';
-import { progressPct } from '@/lib/format';
+import { formatCurrencyEUR, progressPct } from '@/lib/format';
 
 export const revalidate = 0;
 
@@ -20,47 +21,30 @@ type Product = {
   activations_count: number;
   target_activations: number;
   description: string;
-  status?: string | null;
-  subtitle?: string | null;
+  status: string | null;
   available_until?: string | null;
   specs?: Record<string, string> | null;
   gallery_urls?: string[] | null;
 };
 
-function fmtIT(d: Date) { return d.toLocaleDateString('it-IT'); }
-function eur(v: number){ return v.toLocaleString('it-IT',{style:'currency',currency:'EUR'}); }
-function splitTitle(name: string): [string, string | null] {
-  const m = name.match(/^(.*?)\s*[—-]\s*(.*)$/);
-  if (m) return [m[1], m[2]];
-  return [name, null];
+function fmtIT(d: Date) {
+  return d.toLocaleDateString('it-IT');
 }
 
-/** Fallback: estrae la scheda tecnica scritta in chiaro dentro la descrizione */
-function parseSpecsFromDescription(raw?: string): { text: string; specs: [string,string][] } {
-  if (!raw) return { text: '', specs: [] };
-  const re = /scheda\s+tecnica/i;
-  const idx = raw.search(re);
-  if (idx === -1) return { text: raw, specs: [] };
-
-  const before = raw.slice(0, idx).trim();
-  // tag “SCHEDA TECNICA” incluso? togliamolo e prendiamo il resto
-  const afterHeader = raw.slice(idx).replace(re, '').trim();
-
-  // prendi righe fino a un altro header comune (es. “Galleria”, “Descrizione” ecc.)
-  const lines = afterHeader.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-
-  const specs: [string,string][] = [];
-  for (const line of lines) {
-    if (/^(galleria|descrizione|informazioni|note)\b/i.test(line)) break;
-    const clean = line.replace(/^[•\-\u2022\s]+/, ''); // rimuovi •/-
-    const parts = clean.split(/:\s*/);
-    if (parts.length >= 2) {
-      const key = parts.shift()!.trim();
-      const value = parts.join(':').trim();
-      if (key && value) specs.push([key, value]);
-    }
+/** Heuristics per dividere il titolo in 2 righe + sottotitolo (quando utile) */
+function splitTitle(name: string) {
+  let line2 = name;
+  let line3: string | null = null;
+  if (name.includes('—')) {
+    const [a, b] = name.split('—');
+    line2 = a.trim();
+    line3 = b.trim();
+  } else if (name.includes(' - ')) {
+    const [a, b] = name.split(' - ');
+    line2 = a.trim();
+    line3 = b.trim();
   }
-  return { text: before, specs };
+  return { line2, line3 };
 }
 
 export default async function ProductDetailPage({ params }: Props) {
@@ -68,10 +52,12 @@ export default async function ProductDetailPage({ params }: Props) {
   const supabase = createServerSupabase();
 
   const { data: productRaw, error } = await supabase.from('products').select('*').eq('slug', slug).single();
-  if (error || !productRaw) { notFound(); }
+  if (error || !productRaw) {
+    console.error(`Product with slug "${slug}" not found.`, error);
+    notFound();
+  }
 
   const p = productRaw as Product;
-
   const progress = Math.round(progressPct(p.activations_count, p.target_activations));
   const availableUntil = p.available_until
     ? fmtIT(new Date(p.available_until))
@@ -81,23 +67,18 @@ export default async function ProductDetailPage({ params }: Props) {
     ? p.gallery_urls
     : [p.cover_url, p.cover_url, p.cover_url];
 
-  const [mainFromName, subFromName] = splitTitle(p.name);
-  const mainTitle = mainFromName;
-  const subTitle = p.subtitle ?? subFromName;
-
-  // Fallback: se non c’è JSON, prova a parsare la descrizione
-  const parsed = parseSpecsFromDescription(p.description);
-  const descText = parsed.text || p.description;
-  const specsEntries: [string,string][] =
-    p.specs ? (Object.entries(p.specs) as [string,string][]) : parsed.specs;
+  const specsEntries = p.specs ? Object.entries(p.specs) : [];
+  const { line2, line3 } = splitTitle(p.name);
 
   return (
-    <div className="relative min-h-screen bg-[color:var(--qv-bg)] text-[color:var(--qv-text)] pb-safe font-sans">
+    <div className="relative min-h-screen bg-[#0b0b0d] text-white pb-safe font-sans">
       {/* HERO */}
       <div className="relative">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={p.cover_url} alt={p.name} className="w-full h-[75vh] object-cover object-center" />
         <div className="absolute inset-0 bg-hero-gradient" />
+
+        {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-10">
           <Link href="/" aria-label="Torna indietro" className="p-2 rounded-full bg-black/30 backdrop-blur-sm">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 256 256" className="text-white">
@@ -110,25 +91,31 @@ export default async function ProductDetailPage({ params }: Props) {
             </svg>
           </div>
         </div>
-        <div className="absolute bottom-6 left-4 right-4 z-10 space-y-1">
-          <p className="text-white/85 text-xs font-semibold uppercase tracking-[0.14em]">
-            {p.status ?? 'OPEN'}
-          </p>
-          <h1 className="text-3xl font-black leading-tight tracking-[-0.015em] text-shadow-soft">{mainTitle}</h1>
-          {subTitle && <p className="text-sm text-white/85">{subTitle}</p>}
+
+        {/* Titoli nella hero */}
+        <div className="absolute bottom-5 left-4 right-4 z-10">
+          {p.status && (
+            <p className="text-white/80 text-xs font-semibold uppercase tracking-wide">{p.status}</p>
+          )}
+          <h1 className="text-[28px] leading-[1.05] font-black tracking-[-0.015em] text-shadow-soft">
+            {line2}
+          </h1>
+          {line3 && (
+            <p className="text-[16px] font-semibold text-white/90">{line3}</p>
+          )}
         </div>
       </div>
 
       {/* CONTENUTO */}
       <div className="p-4 space-y-6">
-        {/* Progress */}
+        {/* Stato + progress */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-sm text-white/90 font-medium">Attivato</p>
             <p className="text-xs text-white/70">{progress}%</p>
           </div>
           <div className="w-full bg-white/10 rounded-full">
-            <div className="h-2 rounded-full bg-[color:var(--qv-brand)]" style={{ width: `${progress}%` }} />
+            <div className="h-2 rounded-full bg-[var(--qv-brand)]" style={{ width: `${progress}%` }} />
           </div>
         </div>
 
@@ -136,7 +123,7 @@ export default async function ProductDetailPage({ params }: Props) {
         <div className="grid grid-cols-2 gap-3">
           <div className="card-dark p-4">
             <p className="text-xs text-white/70">Valore Stimato</p>
-            <p className="text-lg font-bold">{eur(p.est_value_eur)}</p>
+            <p className="text-lg font-bold">{formatCurrencyEUR(p.est_value_eur)}</p>
           </div>
           <div className="card-dark p-4">
             <p className="text-xs text-white/70">Consegna Stimata</p>
@@ -152,32 +139,34 @@ export default async function ProductDetailPage({ params }: Props) {
           </div>
         </div>
 
-        {/* Descrizione (senza la parte SCHEDA TECNICA se era dentro) */}
+        {/* Descrizione / Filosofia */}
         <section className="space-y-2">
-          <h2 className="text-lg font-bold tracking-[-0.015em]">Descrizione</h2>
-          <p className="text-[15px] leading-relaxed text-white/85 whitespace-pre-line">{descText}</p>
+          <h2 className="font-display text-[18px] font-bold tracking-[-0.015em]">Filosofia M</h2>
+          <p className="font-display text-[15px] leading-relaxed text-white/85 whitespace-pre-line">
+            {p.description}
+          </p>
         </section>
 
-        {/* Scheda tecnica in BOX (da JSON o parser) */}
+        {/* Dati tecnici */}
         {specsEntries.length > 0 && (
           <section className="space-y-3">
-            <h2 className="text-lg font-bold tracking-[-0.015em]">Scheda tecnica</h2>
-            <div className="spec-card">
-              <div className="divide-y divide-white/5">
+            <h2 className="font-display text-[18px] font-bold tracking-[-0.015em]">Dati tecnici</h2>
+            <div className="card-dark p-4">
+              <ul className="divide-y divide-white/5">
                 {specsEntries.map(([k, v]) => (
-                  <div key={k} className="spec-row">
-                    <span className="spec-label">{k}</span>
-                    <span className="spec-value">{v}</span>
-                  </div>
+                  <li key={k} className="flex items-center justify-between py-2">
+                    <span className="font-display text-[13px] text-white/70">{k}</span>
+                    <span className="font-display text-[14px] font-semibold text-white/95 text-right">{v}</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           </section>
         )}
 
         {/* Galleria */}
         <section className="space-y-3">
-          <h2 className="text-lg font-bold tracking-[-0.015em]">Galleria</h2>
+          <h2 className="font-display text-[18px] font-bold tracking-[-0.015em]">Galleria</h2>
           <div className="grid grid-cols-2 gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={gallery[0]} alt="" className="w-full aspect-square object-cover rounded-xl" />
@@ -189,15 +178,9 @@ export default async function ProductDetailPage({ params }: Props) {
         </section>
       </div>
 
-      {/* CTA + nav */}
+      {/* CTA + BottomNav */}
       <CheckoutSheet variant="floating" slug={p.slug} name={p.name} coverUrl={p.cover_url} estValue={p.est_value_eur} />
-      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-[color:var(--qv-border)] bg-black/50 backdrop-blur-lg">
-        <div className="grid grid-cols-3 gap-2 px-6 pt-2 pb-[calc(env(safe-area-inset-bottom)+8px)]">
-          <a className="flex flex-col items-center gap-1 text-white" href="#"><span className="text-xs font-medium">Attività</span></a>
-          <a className="flex flex-col items-center gap-1 text-white/70" href="#"><span className="text-xs font-medium">Portafoglio</span></a>
-          <a className="flex flex-col items-center gap-1 text-white/70" href="#"><span className="text-xs font-medium">Profilo</span></a>
-        </div>
-      </nav>
+      <BottomNav active="home" />
     </div>
   );
 }

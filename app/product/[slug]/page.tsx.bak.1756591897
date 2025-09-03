@@ -20,47 +20,21 @@ type Product = {
   activations_count: number;
   target_activations: number;
   description: string;
-  status?: string | null;
-  subtitle?: string | null;
-  available_until?: string | null;
-  specs?: Record<string, string> | null;
-  gallery_urls?: string[] | null;
+  status?: string | null;          // es. "OPEN" / "G80 COMPETITION"
+  subtitle?: string | null;        // es. "Isle of Man Green"
+  available_until?: string | null; // data scadenza (opzionale)
+  specs?: Record<string, string> | null; // scheda tecnica (opzionale)
+  gallery_urls?: string[] | null;        // galleria (opzionale)
 };
 
 function fmtIT(d: Date) { return d.toLocaleDateString('it-IT'); }
 function eur(v: number){ return v.toLocaleString('it-IT',{style:'currency',currency:'EUR'}); }
+
+// divider titolo: prova a separare main / sub se non abbiamo subtitle
 function splitTitle(name: string): [string, string | null] {
-  const m = name.match(/^(.*?)\s*[—-]\s*(.*)$/);
+  const m = name.match(/^(.*?)\s*[—-]\s*(.*)$/); // "BMW — Isle of Man"
   if (m) return [m[1], m[2]];
   return [name, null];
-}
-
-/** Fallback: estrae la scheda tecnica scritta in chiaro dentro la descrizione */
-function parseSpecsFromDescription(raw?: string): { text: string; specs: [string,string][] } {
-  if (!raw) return { text: '', specs: [] };
-  const re = /scheda\s+tecnica/i;
-  const idx = raw.search(re);
-  if (idx === -1) return { text: raw, specs: [] };
-
-  const before = raw.slice(0, idx).trim();
-  // tag “SCHEDA TECNICA” incluso? togliamolo e prendiamo il resto
-  const afterHeader = raw.slice(idx).replace(re, '').trim();
-
-  // prendi righe fino a un altro header comune (es. “Galleria”, “Descrizione” ecc.)
-  const lines = afterHeader.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-
-  const specs: [string,string][] = [];
-  for (const line of lines) {
-    if (/^(galleria|descrizione|informazioni|note)\b/i.test(line)) break;
-    const clean = line.replace(/^[•\-\u2022\s]+/, ''); // rimuovi •/-
-    const parts = clean.split(/:\s*/);
-    if (parts.length >= 2) {
-      const key = parts.shift()!.trim();
-      const value = parts.join(':').trim();
-      if (key && value) specs.push([key, value]);
-    }
-  }
-  return { text: before, specs };
 }
 
 export default async function ProductDetailPage({ params }: Props) {
@@ -75,29 +49,29 @@ export default async function ProductDetailPage({ params }: Props) {
   const progress = Math.round(progressPct(p.activations_count, p.target_activations));
   const availableUntil = p.available_until
     ? fmtIT(new Date(p.available_until))
-    : fmtIT(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+    : fmtIT(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)); // fallback
 
   const gallery = (Array.isArray(p.gallery_urls) && p.gallery_urls.length >= 3)
     ? p.gallery_urls
     : [p.cover_url, p.cover_url, p.cover_url];
 
+  // titolo su 3 righe: status/tag, main, sub
   const [mainFromName, subFromName] = splitTitle(p.name);
   const mainTitle = mainFromName;
   const subTitle = p.subtitle ?? subFromName;
 
-  // Fallback: se non c’è JSON, prova a parsare la descrizione
-  const parsed = parseSpecsFromDescription(p.description);
-  const descText = parsed.text || p.description;
-  const specsEntries: [string,string][] =
-    p.specs ? (Object.entries(p.specs) as [string,string][]) : parsed.specs;
+  // entries scheda tecnica (se esiste)
+  const specsEntries = p.specs ? Object.entries(p.specs) : [];
 
   return (
     <div className="relative min-h-screen bg-[color:var(--qv-bg)] text-[color:var(--qv-text)] pb-safe font-sans">
-      {/* HERO */}
+      {/* HERO full-bleed */}
       <div className="relative">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={p.cover_url} alt={p.name} className="w-full h-[75vh] object-cover object-center" />
         <div className="absolute inset-0 bg-hero-gradient" />
+
+        {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-10">
           <Link href="/" aria-label="Torna indietro" className="p-2 rounded-full bg-black/30 backdrop-blur-sm">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 256 256" className="text-white">
@@ -110,6 +84,8 @@ export default async function ProductDetailPage({ params }: Props) {
             </svg>
           </div>
         </div>
+
+        {/* Titoli dentro hero */}
         <div className="absolute bottom-6 left-4 right-4 z-10 space-y-1">
           <p className="text-white/85 text-xs font-semibold uppercase tracking-[0.14em]">
             {p.status ?? 'OPEN'}
@@ -121,7 +97,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
       {/* CONTENUTO */}
       <div className="p-4 space-y-6">
-        {/* Progress */}
+        {/* Stato + progress */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-sm text-white/90 font-medium">Attivato</p>
@@ -152,13 +128,13 @@ export default async function ProductDetailPage({ params }: Props) {
           </div>
         </div>
 
-        {/* Descrizione (senza la parte SCHEDA TECNICA se era dentro) */}
+        {/* Descrizione */}
         <section className="space-y-2">
           <h2 className="text-lg font-bold tracking-[-0.015em]">Descrizione</h2>
-          <p className="text-[15px] leading-relaxed text-white/85 whitespace-pre-line">{descText}</p>
+          <p className="text-[15px] leading-relaxed text-white/85 whitespace-pre-line">{p.description}</p>
         </section>
 
-        {/* Scheda tecnica in BOX (da JSON o parser) */}
+        {/* Scheda tecnica (in box) */}
         {specsEntries.length > 0 && (
           <section className="space-y-3">
             <h2 className="text-lg font-bold tracking-[-0.015em]">Scheda tecnica</h2>
@@ -189,7 +165,7 @@ export default async function ProductDetailPage({ params }: Props) {
         </section>
       </div>
 
-      {/* CTA + nav */}
+      {/* CTA floating + bottom-nav sticky */}
       <CheckoutSheet variant="floating" slug={p.slug} name={p.name} coverUrl={p.cover_url} estValue={p.est_value_eur} />
       <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-[color:var(--qv-border)] bg-black/50 backdrop-blur-lg">
         <div className="grid grid-cols-3 gap-2 px-6 pt-2 pb-[calc(env(safe-area-inset-bottom)+8px)]">

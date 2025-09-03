@@ -1,0 +1,159 @@
+import Link from 'next/link';
+import { createServerSupabase } from '@/lib/supabase-server';
+
+export const revalidate = 0;
+
+type Product = {
+  id: string;
+  slug: string;
+  name: string;
+  cover_url: string;
+  est_value_eur: number | null;
+  activations_count: number | null;
+  target_activations: number | null;
+};
+
+const eur = (v?: number | null) =>
+  typeof v === 'number' ? v.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' }) : '—';
+
+const pct = (a?: number | null, t?: number | null) => {
+  const total = Math.max(1, t ?? 1);
+  const done = Math.max(0, a ?? 0);
+  const val = Math.round((done / total) * 100);
+  return Math.max(0, Math.min(100, val));
+};
+
+export default async function Home() {
+  const supabase = createServerSupabase();
+  const { data, error } = await supabase
+    .from('products')
+    .select('id,slug,name,cover_url,est_value_eur,activations_count,target_activations')
+    .limit(24);
+
+  if (error) console.error(error);
+  const products: Product[] = Array.isArray(data) ? data : [];
+  const featured = products.slice(0, 2);
+  const list = products;
+
+  return (
+    <div className="max-w-md mx-auto min-h-screen bg-[var(--background)] pb-24">
+      {/* Header */}
+      <header className="px-4 pt-4 pb-3 border-b border-gray-800">
+        <h1 className="text-xl font-bold text-center tracking-wider">QuotaVera</h1>
+      </header>
+
+      <main className="p-4">
+        {/* In evidenza */}
+        <h2 className="text-2xl font-bold mb-4">In Evidenza</h2>
+
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          {featured.map((p) => (
+            <Link
+              href={`/product/${p.slug}`}
+              key={p.id}
+              className="bg-[var(--surface)] rounded-xl shadow-lg overflow-hidden group"
+            >
+              {/* img */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={p.cover_url}
+                alt={p.name}
+                className="w-full h-32 object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+              {/* testo SOTTO (come prototipo) */}
+              <div className="p-3">
+                <h3 className="font-semibold text-[var(--on-surface)] text-sm leading-tight truncate">
+                  {p.name}
+                </h3>
+                <p className="text-xs text-[var(--on-surface-secondary)] mt-1">
+                  {eur(p.est_value_eur)}
+                </p>
+              </div>
+            </Link>
+          ))}
+          {featured.length === 0 && (
+            <>
+              <div className="bg-[var(--surface)] rounded-xl h-40 animate-pulse" />
+              <div className="bg-[var(--surface)] rounded-xl h-40 animate-pulse" />
+            </>
+          )}
+        </div>
+
+        {/* Filtri (stile chip del prototipo) */}
+        <div className="mb-6 flex gap-2">
+          <button className="bg-[var(--primary)] text-black px-4 py-2 rounded-full text-sm font-semibold shadow">
+            Tutti
+          </button>
+          <button className="bg-[var(--surface)] text-[var(--on-surface)] px-4 py-2 rounded-full text-sm font-medium shadow">
+            Arte
+          </button>
+          <button className="bg-[var(--surface)] text-[var(--on-surface)] px-4 py-2 rounded-full text-sm font-medium shadow">
+            Auto
+          </button>
+        </div>
+
+        {/* Lista compatta come prototipo */}
+        <div className="space-y-3">
+          {list.map((p) => {
+            const progress = pct(p.activations_count, p.target_activations);
+            return (
+              <Link
+                href={`/product/${p.slug}`}
+                key={p.id}
+                className="flex items-center gap-4 p-3 bg-[var(--surface)] rounded-xl shadow-lg"
+              >
+                {/* thumb 64–72px */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.cover_url}
+                  alt=""
+                  className="w-16 h-16 rounded-lg object-cover"
+                />
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-[var(--on-surface)] text-base leading-tight line-clamp-1">
+                    {p.name}
+                  </h4>
+                  <p className="text-sm text-[var(--on-surface-secondary)]">
+                    Valore stimato: {eur(p.est_value_eur)}
+                  </p>
+                  <div className="mt-2">
+                    <div className="bg-gray-700 rounded-full h-1.5">
+                      <div
+                        className="bg-[var(--primary)] h-1.5 rounded-full"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-right text-[var(--on-surface-secondary)] mt-1">
+                      {progress}% completato
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+
+          {list.length === 0 && (
+            <>
+              <div className="h-24 bg-[var(--surface)] rounded-xl animate-pulse" />
+              <div className="h-24 bg-[var(--surface)] rounded-xl animate-pulse" />
+              <div className="h-24 bg-[var(--surface)] rounded-xl animate-pulse" />
+            </>
+          )}
+        </div>
+      </main>
+
+      {/* Footer come prototipo */}
+      <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-black border-t border-gray-800 flex justify-around p-2">
+        <Link href="/" className="text-center text-[var(--primary)]">
+          <span className="block text-xs font-medium">Beni</span>
+        </Link>
+        <Link href="/wallet" className="text-center text-gray-500 hover:text-[var(--primary)]">
+          <span className="block text-xs">Portafoglio</span>
+        </Link>
+        <Link href="/profile" className="text-center text-gray-500 hover:text-[var(--primary)]">
+          <span className="block text-xs">Profilo</span>
+        </Link>
+      </footer>
+    </div>
+  );
+}

@@ -1,0 +1,160 @@
+import React from 'react';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import CheckoutSheet from '@/components/CheckoutSheet';
+import BottomNav from '@/components/BottomNav';
+import { createServerSupabase } from '@/lib/supabase-server';
+import { formatCurrencyEUR, progressPct } from '@/lib/format';
+
+export const revalidate = 0;
+export const dynamic = 'force-dynamic';
+
+type Props = { params: { slug: string } };
+
+type Product = {
+  id: string;
+  slug: string;
+  name: string;
+  cover_url: string;
+  est_value_eur: number;
+  eta_low_days: number;
+  eta_high_days: number;
+  activations_count: number;
+  target_activations: number;
+  description: string;
+  status: string | null;
+  available_until?: string | null;
+  specs?: Record<string, string> | null;
+  gallery_urls?: string[] | null;
+};
+
+function fmtIT(d: Date) { return d.toLocaleDateString('it-IT'); }
+
+function splitTitle(name: string) {
+  // Prova a dividere in 2 righe (es: "BMW M3 Competition — Isle of Man Green")
+  if (name.includes('—')) {
+    const [a,b] = name.split('—');
+    return { main: a.trim(), sub: b.trim() };
+  }
+  if (name.includes(' - ')) {
+    const [a,b] = name.split(' - ');
+    return { main: a.trim(), sub: b.trim() };
+  }
+  return { main: name, sub: null as string|null };
+}
+
+export default async function ProductDetailPage({ params }: Props) {
+  const { slug } = params;
+  const supabase = createServerSupabase();
+
+  const { data: productRaw, error } = await supabase.from('products').select('*').eq('slug', slug).single();
+  if (error || !productRaw) { console.error('Product not found', error); notFound(); }
+
+  const p = productRaw as Product;
+  const progress = Math.round(progressPct(p.activations_count, p.target_activations));
+  const availableUntil = p.available_until ? fmtIT(new Date(p.available_until)) : fmtIT(new Date(Date.now()+30*24*60*60*1000));
+  const gallery = (Array.isArray(p.gallery_urls) && p.gallery_urls.length >= 3) ? p.gallery_urls : [p.cover_url, p.cover_url, p.cover_url];
+  const specsEntries = p.specs ? Object.entries(p.specs) : [];
+  const { main, sub } = splitTitle(p.name);
+
+  return (
+    <div className="relative min-h-screen bg-[#0b0b0d] text-white pb-safe font-sans">
+      {/* HERO */}
+      <div className="relative">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={p.cover_url} alt={p.name} className="w-full h-[75vh] object-cover object-center" />
+        <div className="absolute inset-0 bg-hero-gradient" />
+        <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-10">
+          <Link href="/" aria-label="Torna indietro" className="p-2 rounded-full bg-black/30 backdrop-blur-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 256 256" className="text-white">
+              <path fill="currentColor" d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/>
+            </svg>
+          </Link>
+          <div className="p-2 rounded-full bg-black/30 backdrop-blur-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 256 256" className="text-white">
+              <path d="M128,120a8,8,0,1,1,8-8A8,8,0,0,1,128,120Zm0,32a8,8,0,1,1-8,8A8,8,0,0,1,128,152ZM120,88a8,8,0,1,1,8-8A8,8,0,0,1,120,88Z"></path>
+            </svg>
+          </div>
+        </div>
+        <div className="absolute bottom-5 left-4 right-4 z-10">
+          {p.status && <p className="text-white/80 text-xs font-semibold uppercase tracking-wide">{p.status}</p>}
+          <h1 className="text-[28px] leading-[1.05] font-black tracking-[-0.015em] text-shadow-soft">{main}</h1>
+          {sub && <p className="text-[16px] font-semibold text-white/90">{sub}</p>}
+        </div>
+      </div>
+
+      {/* CONTENUTO */}
+      <div className="p-4 space-y-6">
+        {/* Progress + % */}
+        <section className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-white/90 font-medium">Attivato</p>
+          </div>
+          <div className="bg-white/15 rounded-full h-1.5">
+            <div className="h-1.5 rounded-full bg-[var(--qv-brand)]" style={{ width: `${progress}%` }} />
+          </div>
+          <p className="text-[11px] text-white/60 mt-1 text-right">{progress}% completato</p>
+        </section>
+
+        {/* Cards info (font/stile base per tutto il tema) */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="card-dark p-4">
+            <p className="text-xs text-white/70">Valore Stimato</p>
+            <p className="text-lg font-bold">{formatCurrencyEUR(p.est_value_eur)}</p>
+          </div>
+          <div className="card-dark p-4">
+            <p className="text-xs text-white/70">Consegna Stimata</p>
+            <p className="text-lg font-bold">{p.eta_low_days}-{p.eta_high_days} giorni</p>
+          </div>
+          <div className="card-dark p-4">
+            <p className="text-xs text-white/70">Termine concorso</p>
+            <p className="text-lg font-bold">{availableUntil}</p>
+          </div>
+          <div className="card-dark p-4">
+            <p className="text-xs text-white/70">In palio</p>
+            <p className="text-lg font-bold">Orologio di lusso</p>
+          </div>
+        </div>
+
+        {/* Descrizione (Filosofia M) */}
+        <section className="space-y-2">
+          <h2 className="text-[18px] font-bold tracking-[-0.015em]">Filosofia M</h2>
+          <p className="text-[15px] leading-relaxed text-white/85 whitespace-pre-line">{p.description}</p>
+        </section>
+
+        {/* Dati tecnici in box label/value */}
+        {specsEntries.length > 0 && (
+          <section className="space-y-3">
+            <h2 className="text-[18px] font-bold tracking-[-0.015em]">Dati tecnici</h2>
+            <div className="card-dark p-4">
+              <dl className="grid grid-cols-2 gap-y-3">
+                {specsEntries.map(([k,v]) => (
+                  <React.Fragment key={k}>
+                    <dt className="text-xs text-white/60">{k}</dt>
+                    <dd className="text-sm font-semibold text-white text-right">{v}</dd>
+                  </React.Fragment>
+                ))}
+              </dl>
+            </div>
+          </section>
+        )}
+
+        {/* Galleria */}
+        <section className="space-y-3">
+          <h2 className="text-[18px] font-bold tracking-[-0.015em]">Galleria</h2>
+          <div className="grid grid-cols-2 gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={gallery[0]} alt="" className="w-full aspect-square object-cover rounded-xl" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={gallery[1]} alt="" className="w-full aspect-square object-cover rounded-xl" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={gallery[2]} alt="" className="col-span-2 w-full aspect-[4/3] object-cover rounded-xl" />
+          </div>
+        </section>
+      </div>
+
+      <CheckoutSheet variant="floating" slug={p.slug} name={p.name} coverUrl={p.cover_url} estValue={p.est_value_eur} />
+      <BottomNav active="home" />
+    </div>
+  );
+}

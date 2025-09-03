@@ -37,7 +37,3 @@ body{
 
 .title-card{ @apply font-semibold text-[var(--qv-on-surface)]; }
 .caption-card{ color: var(--qv-on-muted); }
-
-/* — util per carrelli orizzontali — */
-.hide-scrollbar::-webkit-scrollbar{ display:none; }
-.hide-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }

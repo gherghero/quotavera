@@ -1,0 +1,125 @@
+import React from 'react';
+import BottomNav from '@/components/BottomNav';
+import { createServerSupabase } from '@/lib/supabase-server';
+
+export const revalidate = 0;
+
+type Product = {
+  id: string;
+  slug: string;
+  name: string;
+  cover_url: string;
+  est_value_eur: number;
+  activations_count: number | null;
+  target_activations: number | null;
+  category?: string | null;
+};
+
+const eur = (v: number) =>
+  v.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+
+const pct = (a?: number | null, t?: number | null) => {
+  const denom = Math.max(1, (t ?? 1));
+  const ratio = (a ?? 0) / denom;
+  return Math.max(0, Math.min(100, Math.round(ratio * 100)));
+};
+
+export default async function Home() {
+  const supabase = createServerSupabase();
+  const { data: productsRaw } = await supabase
+    .from('products')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  const products = (productsRaw || []) as Product[];
+  const featured = products.slice(0, 2);
+
+  return (
+    <div className="min-h-screen bg-[color:var(--qv-bg)] text-[color:var(--qv-text)] pb-[calc(env(safe-area-inset-bottom)+88px)]">
+      {/* Header */}
+      <header className="p-4 border-b border-[color:var(--qv-border)]">
+        <h1 className="text-xl font-bold text-center tracking-wide">QuotaVera</h1>
+      </header>
+
+      <main className="p-4 space-y-4">
+        {/* In evidenza */}
+        <h2 className="text-2xl font-bold">In Evidenza</h2>
+        <div className="grid grid-cols-2 gap-4">
+          {featured.map((p) => (
+            <a
+              key={p.id}
+              href={`/product/${p.slug}`}
+              className="bg-[color:var(--qv-surface)] rounded-xl shadow-lg overflow-hidden group"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={p.cover_url}
+                alt={p.name}
+                className="w-full h-32 object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+              <div className="p-3">
+                <h3 className="font-semibold text-sm leading-tight truncate text-[color:var(--qv-text)]">
+                  {p.name}
+                </h3>
+                <p className="text-xs text-[color:var(--qv-muted)] mt-1">
+                  {eur(p.est_value_eur)}
+                </p>
+              </div>
+            </a>
+          ))}
+        </div>
+
+        {/* Chips filtro (stile) */}
+        <div className="mb-2 flex space-x-2">
+          <button className="bg-[color:var(--qv-brand)] text-black px-4 h-8 rounded-full text-sm font-semibold">
+            Tutti
+          </button>
+          <button className="bg-[color:var(--qv-surface)] text-[color:var(--qv-text)] px-4 h-8 rounded-full text-sm font-medium">
+            Arte
+          </button>
+          <button className="bg-[color:var(--qv-surface)] text-[color:var(--qv-text)] px-4 h-8 rounded-full text-sm font-medium">
+            Auto
+          </button>
+        </div>
+
+        {/* Lista beni */}
+        <div className="space-y-3">
+          {products.map((p) => {
+            const pcent = pct(p.activations_count, p.target_activations);
+            return (
+              <a
+                key={p.id}
+                href={`/product/${p.slug}`}
+                className="flex items-center space-x-4 p-3 bg-[color:var(--qv-surface)] rounded-xl shadow-lg"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.cover_url} alt="" className="w-16 h-16 rounded-lg object-cover" />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-base text-[color:var(--qv-text)] truncate">
+                    {p.name}
+                  </h4>
+                  <p className="text-sm text-[color:var(--qv-muted)]">
+                    Valore stimato: {eur(p.est_value_eur)}
+                  </p>
+                  <div className="mt-2">
+                    <div className="bg-[#3a3a3c] rounded-full h-1.5">
+                      <div
+                        className="bg-[color:var(--qv-brand)] h-1.5 rounded-full"
+                        style={{ width: `${pcent}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-right text-[color:var(--qv-muted)] mt-1">
+                      {pcent}% completato
+                    </p>
+                  </div>
+                </div>
+              </a>
+            );
+          })}
+        </div>
+      </main>
+
+      <BottomNav active="home" />
+    </div>
+  );
+}

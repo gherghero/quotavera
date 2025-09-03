@@ -6,12 +6,12 @@
 
 /* —— Theme (prototipo) —— */
 :root{
-  --qv-bg: #111111;
-  --qv-surface: #1E1E1E;
-  --qv-primary: #BB86FC;
-  --qv-on-bg: #FFFFFF;
-  --qv-on-surface: #E0E0E0;
-  --qv-on-muted: #A0A0A0;
+  --qv-bg: #111111;           /* background */
+  --qv-surface: #1E1E1E;      /* cards / chip neutri */
+  --qv-primary: #BB86FC;      /* purple */
+  --qv-on-bg: #FFFFFF;        /* testo su bg */
+  --qv-on-surface: #E0E0E0;   /* testo su surface */
+  --qv-on-muted: #A0A0A0;     /* testo secondario */
 }
 
 html,body{ height:100%; }
@@ -29,15 +29,13 @@ body{
 .qv-progress{ @apply h-2 rounded-full bg-[#3b3b3b]; }
 .qv-progress>span{ @apply h-2 rounded-full block; background: var(--qv-primary); }
 
+/* Header blur come nel file di riferimento */
 .qv-header{ @apply fixed top-0 left-0 right-0 z-30 border-b border-white/10 bg-black/50 backdrop-blur-lg; }
+
+/* Spazi di pagina mobile */
 .container-mobile{ @apply max-w-md mx-auto; }
 
-/* 👇 Titolo sezione home: più piccolo e meno invasivo */
-.h2-home{ @apply text-xl font-bold mb-3; color: var(--qv-on-bg); }
-
+/* Titoli/descrizioni coerenti */
+.h2-home{ @apply text-2xl font-bold mb-4; color: var(--qv-on-bg); }
 .title-card{ @apply font-semibold text-[var(--qv-on-surface)]; }
 .caption-card{ color: var(--qv-on-muted); }
-
-/* — util per carrelli orizzontali — */
-.hide-scrollbar::-webkit-scrollbar{ display:none; }
-.hide-scrollbar{ -ms-overflow-style:none; scrollbar-width:none; }

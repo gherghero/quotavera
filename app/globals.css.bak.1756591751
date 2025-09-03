@@ -1,0 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* === QUOTAVERA THEME (dark + verde brand) === */
+:root{
+  --qv-bg: #0b0b0d;
+  --qv-surface: #1c1c1e;
+  --qv-text: #e0e0e0;
+  --qv-muted: #a0a0a0;
+  --qv-border: #222222;
+  --qv-brand: #1f8f4d; /* ACCENT VERDE (coerente col dettaglio) */
+}
+
+html,body{ height:100%; }
+body{
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--qv-bg);
+  color: var(--qv-text);
+}
+
+/* Utilities condivise */
+.bg-hero-gradient{
+  background: linear-gradient(180deg, rgba(0,0,0,0) 0%,
+                                      rgba(0,0,0,.35) 40%,
+                                      rgba(0,0,0,.82) 100%);
+}
+.text-shadow-soft{ text-shadow: 0 1px 2px rgba(0,0,0,.5), 0 6px 24px rgba(0,0,0,.6); }
+
+.pb-safe{ padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+.bottom-safe{ bottom: calc(72px + env(safe-area-inset-bottom)); }
+
+.card-dark{ @apply rounded-xl border border-[#222222] bg-[color:var(--qv-surface)]; }

@@ -1,0 +1,163 @@
+import Link from 'next/link';
+import { createServerSupabase } from '@/lib/supabase-server';
+
+export const revalidate = 0;
+
+type Product = {
+  id: string;
+  slug: string;
+  name: string;
+  cover_url: string;
+  est_value_eur: number | null;
+  activations_count: number | null;
+  target_activations: number | null;
+};
+
+const eur = (v?: number | null) =>
+  typeof v === 'number' ? v.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' }) : '—';
+
+const pct = (a?: number | null, t?: number | null) => {
+  const total = Math.max(1, t ?? 1);
+  const done = Math.max(0, a ?? 0);
+  const val = Math.round((done / total) * 100);
+  return Math.max(0, Math.min(100, val));
+};
+
+export default async function Home() {
+  const supabase = createServerSupabase();
+  const { data, error } = await supabase
+    .from('products')
+    .select('id,slug,name,cover_url,est_value_eur,activations_count,target_activations')
+    .limit(24);
+
+  if (error) console.error(error);
+  const products: Product[] = Array.isArray(data) ? data : [];
+  const featured = products.slice(0, 2);
+  const list = products;
+
+  return (
+    <div className="max-w-md mx-auto bg-[var(--background)] min-h-screen pb-24">
+      {/* Header */}
+      <header className="px-4 pt-4 pb-3 border-b border-gray-800">
+        <h1 className="text-xl font-bold text-center tracking-wider">QuotaVera</h1>
+      </header>
+
+      <main className="p-4">
+        {/* In evidenza */}
+        <h2 className="text-2xl font-bold mb-4">In Evidenza</h2>
+
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          {featured.map((p) => (
+            <Link
+              href={`/product/${p.slug}`}
+              key={p.id}
+              className="relative rounded-2xl overflow-hidden bg-[var(--surface)] shadow-lg"
+            >
+              {/* image */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={p.cover_url}
+                alt={p.name}
+                className="w-full h-40 object-cover"
+              />
+              {/* overlay + testo */}
+              <div className="absolute inset-0 flex flex-col justify-end">
+                <div className="pointer-events-none bg-gradient-to-t from-black/70 via-black/20 to-transparent p-4">
+                  <h3 className="font-semibold text-[var(--on-background)] text-base leading-tight line-clamp-1">
+                    {p.name}
+                  </h3>
+                  <p className="text-xs text-[var(--on-surface-secondary)] mt-0.5">{eur(p.est_value_eur)}</p>
+                </div>
+              </div>
+            </Link>
+          ))}
+          {featured.length === 0 && (
+            <>
+              <div className="bg-[var(--surface)] rounded-2xl h-40 animate-pulse" />
+              <div className="bg-[var(--surface)] rounded-2xl h-40 animate-pulse" />
+            </>
+          )}
+        </div>
+
+        {/* Filtri */}
+        <div className="mb-6 flex gap-2">
+          <button className="bg-[var(--primary)] text-black px-4 py-2 rounded-full text-sm font-semibold shadow-md">
+            Tutti
+          </button>
+          <button className="bg-[var(--surface)] text-[var(--on-surface)] px-4 py-2 rounded-full text-sm font-medium shadow">
+            Arte
+          </button>
+          <button className="bg-[var(--surface)] text-[var(--on-surface)] px-4 py-2 rounded-full text-sm font-medium shadow">
+            Auto
+          </button>
+        </div>
+
+        {/* Lista */}
+        <div className="space-y-3">
+          {list.map((p) => {
+            const progress = pct(p.activations_count, p.target_activations);
+            return (
+              <Link
+                href={`/product/${p.slug}`}
+                key={p.id}
+                className="flex items-center gap-4 p-4 bg-[var(--surface)] rounded-2xl shadow-lg border border-black/10"
+              >
+                {/* thumb */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.cover_url}
+                  alt=""
+                  className="w-18 h-18 min-w-[72px] min-h-[72px] rounded-xl object-cover"
+                  style={{ width: 72, height: 72 }}
+                />
+
+                {/* testo + progress */}
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-[var(--on-surface)] font-semibold text-lg leading-tight line-clamp-1">
+                    {p.name}
+                  </h4>
+                  <p className="text-sm text-[var(--on-surface-secondary)]">
+                    Valore stimato: {eur(p.est_value_eur)}
+                  </p>
+
+                  <div className="mt-3">
+                    <div className="bg-[#3a3a48] rounded-full h-2">
+                      <div
+                        className="bg-[var(--primary)] h-2 rounded-full"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-[var(--on-surface-secondary)] mt-1 text-right">
+                      {progress}% completato
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+
+          {list.length === 0 && (
+            <>
+              <div className="h-24 bg-[var(--surface)] rounded-2xl animate-pulse" />
+              <div className="h-24 bg-[var(--surface)] rounded-2xl animate-pulse" />
+              <div className="h-24 bg-[var(--surface)] rounded-2xl animate-pulse" />
+            </>
+          )}
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-black border-t border-gray-800 flex justify-around p-2">
+        <Link href="/" className="text-center text-[var(--primary)]">
+          <span className="block text-xs font-medium">Beni</span>
+        </Link>
+        <Link href="/wallet" className="text-center text-gray-500 hover:text-[var(--primary)]">
+          <span className="block text-xs">Portafoglio</span>
+        </Link>
+        <Link href="/profile" className="text-center text-gray-500 hover:text-[var(--primary)]">
+          <span className="block text-xs">Profilo</span>
+        </Link>
+      </footer>
+    </div>
+  );
+}

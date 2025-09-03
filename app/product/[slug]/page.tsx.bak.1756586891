@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import CheckoutSheet from '@/components/CheckoutSheet';
 import { createServerSupabase } from '@/lib/supabase-server';
-import { progressPct } from '@/lib/format';
+import { formatCurrencyEUR, progressPct } from '@/lib/format';
 
 export const revalidate = 0;
 
@@ -20,47 +20,14 @@ type Product = {
   activations_count: number;
   target_activations: number;
   description: string;
-  status?: string | null;
-  subtitle?: string | null;
-  available_until?: string | null;
-  specs?: Record<string, string> | null;
-  gallery_urls?: string[] | null;
+  status: string | null;
+  available_until?: string | null;     // nuovo campo opzionale
+  specs?: Record<string, string> | null; // se già presente in DB
+  gallery_urls?: string[] | null;        // se già presente in DB
 };
 
-function fmtIT(d: Date) { return d.toLocaleDateString('it-IT'); }
-function eur(v: number){ return v.toLocaleString('it-IT',{style:'currency',currency:'EUR'}); }
-function splitTitle(name: string): [string, string | null] {
-  const m = name.match(/^(.*?)\s*[—-]\s*(.*)$/);
-  if (m) return [m[1], m[2]];
-  return [name, null];
-}
-
-/** Fallback: estrae la scheda tecnica scritta in chiaro dentro la descrizione */
-function parseSpecsFromDescription(raw?: string): { text: string; specs: [string,string][] } {
-  if (!raw) return { text: '', specs: [] };
-  const re = /scheda\s+tecnica/i;
-  const idx = raw.search(re);
-  if (idx === -1) return { text: raw, specs: [] };
-
-  const before = raw.slice(0, idx).trim();
-  // tag “SCHEDA TECNICA” incluso? togliamolo e prendiamo il resto
-  const afterHeader = raw.slice(idx).replace(re, '').trim();
-
-  // prendi righe fino a un altro header comune (es. “Galleria”, “Descrizione” ecc.)
-  const lines = afterHeader.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-
-  const specs: [string,string][] = [];
-  for (const line of lines) {
-    if (/^(galleria|descrizione|informazioni|note)\b/i.test(line)) break;
-    const clean = line.replace(/^[•\-\u2022\s]+/, ''); // rimuovi •/-
-    const parts = clean.split(/:\s*/);
-    if (parts.length >= 2) {
-      const key = parts.shift()!.trim();
-      const value = parts.join(':').trim();
-      if (key && value) specs.push([key, value]);
-    }
-  }
-  return { text: before, specs };
+function fmtIT(d: Date) {
+  return d.toLocaleDateString('it-IT');
 }
 
 export default async function ProductDetailPage({ params }: Props) {
@@ -68,36 +35,36 @@ export default async function ProductDetailPage({ params }: Props) {
   const supabase = createServerSupabase();
 
   const { data: productRaw, error } = await supabase.from('products').select('*').eq('slug', slug).single();
-  if (error || !productRaw) { notFound(); }
+  if (error || !productRaw) {
+    console.error(`Product with slug "${slug}" not found.`, error);
+    notFound();
+  }
 
   const p = productRaw as Product;
-
   const progress = Math.round(progressPct(p.activations_count, p.target_activations));
   const availableUntil = p.available_until
     ? fmtIT(new Date(p.available_until))
-    : fmtIT(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+    : fmtIT(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)); // fallback
 
   const gallery = (Array.isArray(p.gallery_urls) && p.gallery_urls.length >= 3)
     ? p.gallery_urls
     : [p.cover_url, p.cover_url, p.cover_url];
 
-  const [mainFromName, subFromName] = splitTitle(p.name);
-  const mainTitle = mainFromName;
-  const subTitle = p.subtitle ?? subFromName;
-
-  // Fallback: se non c’è JSON, prova a parsare la descrizione
-  const parsed = parseSpecsFromDescription(p.description);
-  const descText = parsed.text || p.description;
-  const specsEntries: [string,string][] =
-    p.specs ? (Object.entries(p.specs) as [string,string][]) : parsed.specs;
+  const specsEntries = p.specs ? Object.entries(p.specs) : [];
 
   return (
-    <div className="relative min-h-screen bg-[color:var(--qv-bg)] text-[color:var(--qv-text)] pb-safe font-sans">
-      {/* HERO */}
+    <div className="relative min-h-screen bg-[#0b0b0d] text-white pb-safe font-sans">
+      {/* HERO full-bleed */}
       <div className="relative">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={p.cover_url} alt={p.name} className="w-full h-[75vh] object-cover object-center" />
+        <img
+          src={p.cover_url}
+          alt={p.name}
+          className="w-full h-[75vh] object-cover object-center"
+        />
         <div className="absolute inset-0 bg-hero-gradient" />
+
+        {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between z-10">
           <Link href="/" aria-label="Torna indietro" className="p-2 rounded-full bg-black/30 backdrop-blur-sm">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 256 256" className="text-white">
@@ -110,33 +77,32 @@ export default async function ProductDetailPage({ params }: Props) {
             </svg>
           </div>
         </div>
-        <div className="absolute bottom-6 left-4 right-4 z-10 space-y-1">
-          <p className="text-white/85 text-xs font-semibold uppercase tracking-[0.14em]">
-            {p.status ?? 'OPEN'}
-          </p>
-          <h1 className="text-3xl font-black leading-tight tracking-[-0.015em] text-shadow-soft">{mainTitle}</h1>
-          {subTitle && <p className="text-sm text-white/85">{subTitle}</p>}
+
+        {/* Titoli dentro hero */}
+        <div className="absolute bottom-5 left-4 right-4 z-10">
+          {p.status && <p className="text-white/80 text-xs font-medium uppercase tracking-wide">{p.status}</p>}
+          <h1 className="text-3xl font-black leading-tight tracking-[-0.015em] text-shadow-soft">{p.name}</h1>
         </div>
       </div>
 
       {/* CONTENUTO */}
       <div className="p-4 space-y-6">
-        {/* Progress */}
+        {/* Stato + progress */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-sm text-white/90 font-medium">Attivato</p>
             <p className="text-xs text-white/70">{progress}%</p>
           </div>
           <div className="w-full bg-white/10 rounded-full">
-            <div className="h-2 rounded-full bg-[color:var(--qv-brand)]" style={{ width: `${progress}%` }} />
+            <div className="h-2 rounded-full bg-[var(--qv-brand)]" style={{ width: `${progress}%` }} />
           </div>
         </div>
 
-        {/* Cards info */}
+        {/* Cards info: valore/consegna + scadenza/premio */}
         <div className="grid grid-cols-2 gap-3">
           <div className="card-dark p-4">
             <p className="text-xs text-white/70">Valore Stimato</p>
-            <p className="text-lg font-bold">{eur(p.est_value_eur)}</p>
+            <p className="text-lg font-bold">{formatCurrencyEUR(p.est_value_eur)}</p>
           </div>
           <div className="card-dark p-4">
             <p className="text-xs text-white/70">Consegna Stimata</p>
@@ -152,25 +118,25 @@ export default async function ProductDetailPage({ params }: Props) {
           </div>
         </div>
 
-        {/* Descrizione (senza la parte SCHEDA TECNICA se era dentro) */}
+        {/* Descrizione */}
         <section className="space-y-2">
           <h2 className="text-lg font-bold tracking-[-0.015em]">Descrizione</h2>
-          <p className="text-[15px] leading-relaxed text-white/85 whitespace-pre-line">{descText}</p>
+          <p className="text-[15px] leading-relaxed text-white/85 whitespace-pre-line">{p.description}</p>
         </section>
 
-        {/* Scheda tecnica in BOX (da JSON o parser) */}
+        {/* Dati tecnici (se presenti) */}
         {specsEntries.length > 0 && (
           <section className="space-y-3">
-            <h2 className="text-lg font-bold tracking-[-0.015em]">Scheda tecnica</h2>
-            <div className="spec-card">
-              <div className="divide-y divide-white/5">
-                {specsEntries.map(([k, v]) => (
-                  <div key={k} className="spec-row">
-                    <span className="spec-label">{k}</span>
-                    <span className="spec-value">{v}</span>
-                  </div>
+            <h2 className="text-lg font-bold tracking-[-0.015em]">Dati tecnici</h2>
+            <div className="card-dark p-4">
+              <ul className="divide-y divide-white/5">
+                {specsEntries.map(([k,v]) => (
+                  <li key={k} className="flex items-center justify-between py-2">
+                    <span className="text-sm text-white/75">{k}</span>
+                    <span className="text-sm font-medium text-white/95 text-right">{v}</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           </section>
         )}
@@ -189,13 +155,41 @@ export default async function ProductDetailPage({ params }: Props) {
         </section>
       </div>
 
-      {/* CTA + nav */}
-      <CheckoutSheet variant="floating" slug={p.slug} name={p.name} coverUrl={p.cover_url} estValue={p.est_value_eur} />
-      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-[color:var(--qv-border)] bg-black/50 backdrop-blur-lg">
+      {/* CTA floating + bottom-nav sticky */}
+      <CheckoutSheet
+        variant="floating"
+        slug={p.slug}
+        name={p.name}
+        coverUrl={p.cover_url}
+        estValue={p.est_value_eur}
+      />
+
+      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-[#2a2a2b] bg-black/50 backdrop-blur-lg">
         <div className="grid grid-cols-3 gap-2 px-6 pt-2 pb-[calc(env(safe-area-inset-bottom)+8px)]">
-          <a className="flex flex-col items-center gap-1 text-white" href="#"><span className="text-xs font-medium">Attività</span></a>
-          <a className="flex flex-col items-center gap-1 text-white/70" href="#"><span className="text-xs font-medium">Portafoglio</span></a>
-          <a className="flex flex-col items-center gap-1 text-white/70" href="#"><span className="text-xs font-medium">Profilo</span></a>
+          <a className="flex flex-col items-center gap-1 text-white" href="#">
+            <div className="h-6 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 256 256">
+                <path d="M224,115.55V208a16,16,0,0,1-16,16H168a16,16,0,0,1-16-16V168a8,8,0,0,0-8-8H112a8,8,0,0,0-8,8v40a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V115.55a16,16,0,0,1,5.17-11.78l80-75.48.11-.11a16,16,0,0,1,21.53,0,1.14,1.14,0,0,0,.11.11l80,75.48A16,16,0,0,1,224,115.55Z"></path>
+              </svg>
+            </div>
+            <span className="text-xs font-medium">Attività</span>
+          </a>
+          <a className="flex flex-col items-center gap-1 text-white/70" href="#">
+            <div className="h-6 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 256 256">
+                <path d="M216,72H56a8,8,0,0,1,0-16H192a8,8,0,0,0,0-16H56A24,24,0,0,0,32,64V192a24,24,0,0,0,24,24H216a16,16,0,0,0,16-16V88A16,16,0,0,0,216,72Zm-48,68a12,12,0,1,1,12,12A12,12,0,0,1,168,140Z"></path>
+              </svg>
+            </div>
+            <span className="text-xs font-medium">Portafoglio</span>
+          </a>
+          <a className="flex flex-col items-center gap-1 text-white/70" href="#">
+            <div className="h-6 flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 256 256">
+                <path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.78,40.31,185.66,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8ZM72,96a56,56,0,1,1,56,56A56.06,56.06,0,0,1,72,96Z"></path>
+              </svg>
+            </div>
+            <span className="text-xs font-medium">Profilo</span>
+          </a>
         </div>
       </nav>
     </div>

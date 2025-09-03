@@ -124,7 +124,6 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Sea
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-base font-bold">{humanLabel(pk.package_key)}</div>
-                  <div className="text-sm text-[#4e6797]">Include {pk.entries} ingresso{pk.entries > 1 ? 'i' : ''}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-base font-bold">{formatCurrencyEUR(pk.price_eur)}</div>

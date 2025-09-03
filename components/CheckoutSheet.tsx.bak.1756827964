@@ -115,7 +115,7 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
         <div className="fixed left-0 right-0 bottom-safe z-40 px-4">
           <button
             type="button" onClick={() => setOpen(true)}
-            className="w-full h-12 rounded-xl bg-[var(--primary)] text-white font-bold shadow-[0_10px_30px_rgba(31,143,77,.35)] active:scale-[.98] transition"
+            className="w-full h-12 rounded-xl bg-[var(--qv-brand)] text-white font-bold shadow-[0_10px_30px_rgba(31,143,77,.35)] active:scale-[.98] transition"
           >
             Attiva Pass
           </button>
@@ -210,7 +210,7 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
                   <button type="button" onClick={() => setStep(1)} className="flex-1 h-11 rounded-xl border">Indietro</button>
                   <button
                     type="button" disabled={!payMethod || loading} onClick={confirm}
-                    className="flex-1 h-11 rounded-xl bg-[var(--primary)] text-white disabled:opacity-60 shadow-sm"
+                    className="flex-1 h-11 rounded-xl bg-[var(--qv-brand)] text-white disabled:opacity-60 shadow-sm"
                   >
                     {loading ? 'Acquisto…' : 'Conferma e acquista'}
                   </button>
@@ -226,7 +226,7 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
                 <p className="text-sm text-gray-600">Il bene digitale è stato aggiunto al tuo wallet <i>(demo locale)</i>.</p>
                 <div className="flex gap-3 pt-2">
                   <a href="/wallet" className="flex-1 h-11 rounded-xl border flex items-center justify-center">Vai al wallet</a>
-                  <button type="button" onClick={resetAndClose} className="flex-1 h-11 rounded-xl bg-[var(--primary)] text-white">Chiudi</button>
+                  <button type="button" onClick={resetAndClose} className="flex-1 h-11 rounded-xl bg-[var(--qv-brand)] text-white">Chiudi</button>
                 </div>
               </div>
             )}

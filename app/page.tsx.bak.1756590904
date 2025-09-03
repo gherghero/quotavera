@@ -1,0 +1,105 @@
+import Link from "next/link";
+import Progress from "@/components/Progress";
+import BottomNav from "@/components/BottomNav";
+import { createServerSupabase } from "@/lib/supabase-server";
+
+type Product = {
+  id: string;
+  slug: string;
+  name: string;
+  cover_url: string;
+  est_value_eur: number;
+  activations_count: number;
+  target_activations: number;
+};
+
+function formatEUR(n: number){
+  return n.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+}
+function pct(done: number, target: number){
+  if (!target || target <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((done/target)*100)));
+}
+
+export const revalidate = 0;
+
+export default async function HomePage(){
+  const supabase = createServerSupabase();
+  const { data: products = [] } = await supabase
+    .from('products')
+    .select('id,slug,name,cover_url,est_value_eur,activations_count,target_activations')
+    .order('id', { ascending: true })
+    .limit(20);
+
+  const featured = products.slice(0,2);
+
+  return (
+    <div className="min-h-screen bg-[var(--qv-bg)] text-[var(--qv-text)] pb-safe">
+      {/* Header */}
+      <header className="p-4 border-b border-[#2a2a2b] sticky top-0 bg-[var(--qv-bg)] z-20">
+        <h1 className="text-center text-2xl font-extrabold tracking-wider">QuotaVera</h1>
+      </header>
+
+      <main className="p-4">
+        <h2 className="qv-h2 mb-4">In Evidenza</h2>
+
+        {/* Grid 2 featured */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          {featured.map(p => (
+            <Link key={p.id} href={`/product/${p.slug}`} className="qv-card overflow-hidden group">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                alt={p.name}
+                src={p.cover_url}
+                className="w-full h-32 object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+              <div className="p-3">
+                <h3 className="font-semibold text-sm leading-tight line-clamp-2">{p.name}</h3>
+                <p className="text-xs qv-caption mt-1">{formatEUR(p.est_value_eur)}</p>
+              </div>
+            </Link>
+          ))}
+          {featured.length < 2 && (
+            <div className="qv-card p-4 text-sm text-white/60">Aggiungi prodotti per riempire l'area evidenza.</div>
+          )}
+        </div>
+
+        {/* Chips (statiche per ora, solo stile) */}
+        <div className="mb-6 flex items-center gap-2">
+          <button className="qv-chip qv-chip--active">Tutti</button>
+          <button className="qv-chip">Arte</button>
+          <button className="qv-chip">Auto</button>
+        </div>
+
+        {/* Lista */}
+        <section className="space-y-4">
+          {products.map(p => {
+            const pcent = pct(p.activations_count, p.target_activations);
+            return (
+              <Link key={p.id} href={`/product/${p.slug}`} className="qv-card p-3 flex items-center gap-4">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={p.cover_url}
+                  alt={p.name}
+                  className="w-16 h-16 rounded-lg object-cover"
+                />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-[var(--qv-text)] text-base leading-tight line-clamp-1">
+                    {p.name}
+                  </h4>
+                  <p className="text-sm qv-caption">Valore stimato: {formatEUR(p.est_value_eur)}</p>
+                  <Progress value={pcent} />
+                </div>
+              </Link>
+            );
+          })}
+          {products.length === 0 && (
+            <div className="qv-card p-4 text-sm text-white/60">Nessun prodotto disponibile.</div>
+          )}
+        </section>
+      </main>
+
+      <BottomNav active="home" />
+    </div>
+  );
+}

@@ -1,3 +1,4 @@
+// NOTE: UI aggiornata (font-size/spaziature come Figma), stesso flusso logico
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -7,8 +8,8 @@ type Props = {
   name: string;
   coverUrl?: string;
   estValue?: number;
-  /** sticky: CTA fissa in basso (chiara); inline: bottone in-page; floating: bottone verde fisso sopra la bottom-nav. */
-  variant?: 'sticky' | 'inline' | 'floating';
+  /** sticky: CTA fissa in basso (default). inline: bottone in-page. */
+  variant?: 'sticky' | 'inline';
 };
 
 type PkgRow = { package_key: 'base' | 'smart' | 'plus'; price_eur: number; entries: number };
@@ -28,7 +29,8 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
   useEffect(() => {
     if (!open) return;
     (async () => {
-      setError(null); setLoading(true);
+      setError(null);
+      setLoading(true);
       try {
         const res = await fetch(`/api/packages?slug=${encodeURIComponent(slug)}`);
         const json = await res.json();
@@ -36,7 +38,9 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
         setPkgs(json.packages as PkgRow[]);
       } catch (e: any) {
         setError(e.message || 'Errore imprevisto');
-      } finally { setLoading(false); }
+      } finally {
+        setLoading(false);
+      }
     })();
   }, [open, slug]);
 
@@ -45,14 +49,19 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
     [step]
   );
 
-  function proceed(pkg: PkgRow) { setSelected(pkg); setStep(2); }
+  function proceed(pkg: PkgRow) {
+    setSelected(pkg);
+    setStep(2);
+  }
 
   async function confirm() {
     if (!selected || !payMethod) return;
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
     try {
       const res = await fetch('/api/mock-purchase', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug, packageKey: selected.package_key, payMethod }),
       });
       const json = await res.json();
@@ -61,29 +70,41 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
       const key = 'qv_wallet_demo';
       const prev = JSON.parse(localStorage.getItem(key) || '[]');
       prev.push({
-        slug, name, coverUrl: coverUrl || null,
+        slug,
+        name,
+        coverUrl: coverUrl || null,
         packageKey: selected.package_key,
-        entries: selected.entries, price_eur: selected.price_eur, ts: Date.now(),
+        entries: selected.entries,
+        price_eur: selected.price_eur,
+        ts: Date.now(),
       });
       localStorage.setItem(key, JSON.stringify(prev));
       setStep(3);
     } catch (e: any) {
       setError(e.message || 'Errore imprevisto');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }
 
   function resetAndClose() {
     setOpen(false);
-    setTimeout(() => { setStep(1); setSelected(null); setPayMethod(null); setError(null); }, 200);
+    setTimeout(() => {
+      setStep(1);
+      setSelected(null);
+      setPayMethod(null);
+      setError(null);
+    }, 200);
   }
 
   return (
     <>
-      {variant === 'sticky' && (
+      {variant === 'sticky' ? (
         <div className="fixed bottom-0 left-0 right-0 bg-[#f8f9fc] border-t border-[#e7ebf3]">
           <div className="p-4">
             <button
-              type="button" onClick={() => setOpen(true)}
+              type="button"
+              onClick={() => setOpen(true)}
               className="flex w-full items-center justify-center rounded-xl h-12 px-5 bg-[#081c44] text-[#f8f9fc] text-base font-bold shadow-sm"
             >
               Attiva Pass
@@ -93,13 +114,12 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
             </p>
           </div>
         </div>
-      )}
-
-      {variant === 'inline' && (
+      ) : (
         <div className="mt-2">
           <div className="flex px-4 py-3">
             <button
-              type="button" onClick={() => setOpen(true)}
+              type="button"
+              onClick={() => setOpen(true)}
               className="flex min-w-[84px] max-w-[480px] items-center justify-center rounded-xl h-12 px-5 flex-1 bg-[#081c44] text-[#f8f9fc] text-base font-bold tracking-[0.015em] shadow-sm"
             >
               <span className="truncate">Attiva Pass</span>
@@ -111,18 +131,6 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
         </div>
       )}
 
-      {variant === 'floating' && (
-        <div className="fixed left-0 right-0 bottom-safe z-40 px-4">
-          <button
-            type="button" onClick={() => setOpen(true)}
-            className="w-full h-12 rounded-xl bg-[var(--primary)] text-white font-bold shadow-[0_10px_30px_rgba(31,143,77,.35)] active:scale-[.98] transition"
-          >
-            Attiva Pass
-          </button>
-        </div>
-      )}
-
-      {/* Bottom sheet */}
       {open && (
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50" onClick={resetAndClose} />
@@ -132,7 +140,7 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
               <button type="button" className="p-2 text-gray-500" onClick={resetAndClose} aria-label="Chiudi">✕</button>
             </div>
 
-            {/* STEP 1 */}
+            {/* STEP 1 — pacchetti (font/spacing Figma) */}
             {step === 1 && (
               <div className="p-2">
                 {loading && <p className="p-4 text-sm">Carico pacchetti…</p>}
@@ -146,7 +154,8 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
                       <div className="flex items-center gap-3">
                         <div className="text-[16px] font-semibold">{fmtEUR(p.price_eur)}</div>
                         <button
-                          type="button" onClick={() => proceed(p)}
+                          type="button"
+                          onClick={() => proceed(p)}
                           className="px-3 py-2 rounded-lg bg-[#081c44] text-white text-[13px] shadow-sm"
                         >
                           Procedi
@@ -167,7 +176,7 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
               </div>
             )}
 
-            {/* STEP 2 */}
+            {/* STEP 2 — pagamento */}
             {step === 2 && selected && (
               <div className="p-4 space-y-4">
                 <div className="flex gap-3">
@@ -209,8 +218,10 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setStep(1)} className="flex-1 h-11 rounded-xl border">Indietro</button>
                   <button
-                    type="button" disabled={!payMethod || loading} onClick={confirm}
-                    className="flex-1 h-11 rounded-xl bg-[var(--primary)] text-white disabled:opacity-60 shadow-sm"
+                    type="button"
+                    disabled={!payMethod || loading}
+                    onClick={confirm}
+                    className="flex-1 h-11 rounded-xl bg-[#081c44] text-white disabled:opacity-60 shadow-sm"
                   >
                     {loading ? 'Acquisto…' : 'Conferma e acquista'}
                   </button>
@@ -218,7 +229,7 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
               </div>
             )}
 
-            {/* STEP 3 */}
+            {/* STEP 3 — successo */}
             {step === 3 && (
               <div className="p-6 text-center space-y-3">
                 <div className="text-3xl">✅</div>
@@ -226,7 +237,7 @@ export default function CheckoutSheet({ slug, name, coverUrl, estValue, variant 
                 <p className="text-sm text-gray-600">Il bene digitale è stato aggiunto al tuo wallet <i>(demo locale)</i>.</p>
                 <div className="flex gap-3 pt-2">
                   <a href="/wallet" className="flex-1 h-11 rounded-xl border flex items-center justify-center">Vai al wallet</a>
-                  <button type="button" onClick={resetAndClose} className="flex-1 h-11 rounded-xl bg-[var(--primary)] text-white">Chiudi</button>
+                  <button type="button" onClick={resetAndClose} className="flex-1 h-11 rounded-xl bg-[#081c44] text-white">Chiudi</button>
                 </div>
               </div>
             )}
